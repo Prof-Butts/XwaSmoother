@@ -21,7 +21,18 @@ namespace XwaSmoother
         {
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                inputFileTextBox.Text = openFileDialog.FileName;
+                string sInFileName = openFileDialog.FileName;
+                inputFileTextBox.Text = sInFileName;
+                // Automatically populate a suggested output file
+                string sInPath = Path.GetDirectoryName(sInFileName);
+                string sOutFileName = Path.GetFileNameWithoutExtension(sInFileName);
+                sOutFileName = Path.Combine(sInPath, sOutFileName + "-new.opt");
+                outputFileTextBox.Text = sOutFileName;
+                if (File.Exists(sOutFileName))
+                {
+                    MessageBox.Show("Suggested output file already exists. It will be overwritten",
+                        "Output File Exists", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
             }
         }
 
