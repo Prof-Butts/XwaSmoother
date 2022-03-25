@@ -26,9 +26,12 @@ namespace XwaSmoother
                 // Automatically populate a suggested output file
                 string sInPath = Path.GetDirectoryName(sInFileName);
                 string sOutFileName = Path.GetFileNameWithoutExtension(sInFileName);
-                sOutFileName = Path.Combine(sInPath, sOutFileName + "-new.opt");
+                if (overwriteCheckBox.Checked)
+                    sOutFileName = Path.Combine(sInPath, sOutFileName + ".opt");
+                else
+                    sOutFileName = Path.Combine(sInPath, sOutFileName + "-new.opt");
                 outputFileTextBox.Text = sOutFileName;
-                if (File.Exists(sOutFileName))
+                if (File.Exists(sOutFileName) && !overwriteCheckBox.Checked)
                 {
                     MessageBox.Show("Suggested output file already exists. It will be overwritten",
                         "Output File Exists", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -44,29 +47,40 @@ namespace XwaSmoother
             }
         }
 
+        private bool ValidateInputOutputTextBoxes()
+        {
+            string sInFileName = inputFileTextBox.Text;
+            string sOutFileName = outputFileTextBox.Text;
+
+            if (sInFileName.Length == 0)
+            {
+                MessageBox.Show("Missing input file", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+
+            if (!File.Exists(sInFileName))
+            {
+                MessageBox.Show("File: " + sInFileName + ", does not exist", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+
+            if (sOutFileName.Length == 0)
+            {
+                MessageBox.Show("Missing output file", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+
+            return true;
+        }
+
         private void smoothButton_Click(object sender, EventArgs e)
         {
             string sInFileName = inputFileTextBox.Text;
             string sOutFileName = outputFileTextBox.Text;
             string sThreshold = thresholdsTextBox.Text.Replace(" ", "");
 
-            if (sInFileName.Length == 0)
-            {
-                MessageBox.Show("Missing input file", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (!ValidateInputOutputTextBoxes())
                 return;
-            }
-
-            if (!File.Exists(sInFileName))
-            {
-                MessageBox.Show("File: " + sInFileName + ", does not exist", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            if (sOutFileName.Length == 0)
-            {
-                MessageBox.Show("Missing output file", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
 
             if (sThreshold.Length == 0)
             {
@@ -94,6 +108,37 @@ namespace XwaSmoother
 
             int NumMeshes = SmootherEngine.Smooth(sInFileName, sOutFileName, Thresholds);
             MessageBox.Show(NumMeshes + " meshes smoothed", "Success", MessageBoxButtons.OK);
+        }
+
+        private void tangentMapButton_Click(object sender, EventArgs e)
+        {
+            // Input validation
+            if (xwaDirTextBox.Text.Trim().Length == 0)
+            {
+                MessageBox.Show("Select the XWA root directory first", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            SmootherEngine.sXwaRootDirectory = xwaDirTextBox.Text;
+
+            if (!ValidateInputOutputTextBoxes())
+                return;
+
+            string sError = "";
+            uint NumMeshes = SmootherEngine.ComputeTangentMap(inputFileTextBox.Text, outputFileTextBox.Text, out sError);
+            if (sError.Length == 0)
+                MessageBox.Show(NumMeshes + " meshes processed", "Success", MessageBoxButtons.OK);
+            else
+                MessageBox.Show(sError, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+
+        private void selectXWADirButton_Click(object sender, EventArgs e)
+        {
+            if (xwaDirBrowserDialog.ShowDialog() == DialogResult.OK)
+            {
+                xwaDirTextBox.Text = xwaDirBrowserDialog.SelectedPath;
+                SmootherEngine.sXwaRootDirectory = xwaDirTextBox.Text;
+            }
         }
     }
 }

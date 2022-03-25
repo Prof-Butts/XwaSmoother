@@ -40,6 +40,12 @@
             this.thresholdsTextBox = new System.Windows.Forms.TextBox();
             this.label3 = new System.Windows.Forms.Label();
             this.smoothButton = new System.Windows.Forms.Button();
+            this.tangentMapButton = new System.Windows.Forms.Button();
+            this.overwriteCheckBox = new System.Windows.Forms.CheckBox();
+            this.label4 = new System.Windows.Forms.Label();
+            this.xwaDirTextBox = new System.Windows.Forms.TextBox();
+            this.xwaDirBrowserDialog = new System.Windows.Forms.FolderBrowserDialog();
+            this.selectXWADirButton = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // inputFileTextBox
@@ -53,7 +59,7 @@
             // 
             this.inputFileButton.Location = new System.Drawing.Point(903, 22);
             this.inputFileButton.Name = "inputFileButton";
-            this.inputFileButton.Size = new System.Drawing.Size(75, 23);
+            this.inputFileButton.Size = new System.Drawing.Size(98, 23);
             this.inputFileButton.TabIndex = 1;
             this.inputFileButton.Text = "&Input...";
             this.inputFileButton.UseVisualStyleBackColor = true;
@@ -81,7 +87,7 @@
             // 
             this.outputFileButton.Location = new System.Drawing.Point(903, 67);
             this.outputFileButton.Name = "outputFileButton";
-            this.outputFileButton.Size = new System.Drawing.Size(75, 23);
+            this.outputFileButton.Size = new System.Drawing.Size(98, 23);
             this.outputFileButton.TabIndex = 4;
             this.outputFileButton.Text = "&Output...";
             this.outputFileButton.UseVisualStyleBackColor = true;
@@ -106,7 +112,7 @@
             // 
             // thresholdsTextBox
             // 
-            this.thresholdsTextBox.Location = new System.Drawing.Point(12, 115);
+            this.thresholdsTextBox.Location = new System.Drawing.Point(12, 123);
             this.thresholdsTextBox.Name = "thresholdsTextBox";
             this.thresholdsTextBox.Size = new System.Drawing.Size(885, 20);
             this.thresholdsTextBox.TabIndex = 6;
@@ -114,7 +120,7 @@
             // label3
             // 
             this.label3.AutoSize = true;
-            this.label3.Location = new System.Drawing.Point(12, 99);
+            this.label3.Location = new System.Drawing.Point(12, 102);
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(762, 13);
             this.label3.TabIndex = 7;
@@ -124,19 +130,74 @@
             // 
             // smoothButton
             // 
-            this.smoothButton.Location = new System.Drawing.Point(903, 112);
+            this.smoothButton.Location = new System.Drawing.Point(903, 121);
             this.smoothButton.Name = "smoothButton";
-            this.smoothButton.Size = new System.Drawing.Size(75, 23);
-            this.smoothButton.TabIndex = 8;
-            this.smoothButton.Text = "&Smooth";
+            this.smoothButton.Size = new System.Drawing.Size(98, 23);
+            this.smoothButton.TabIndex = 7;
+            this.smoothButton.Text = "&Smooth Normals";
             this.smoothButton.UseVisualStyleBackColor = true;
             this.smoothButton.Click += new System.EventHandler(this.smoothButton_Click);
+            // 
+            // tangentMapButton
+            // 
+            this.tangentMapButton.Location = new System.Drawing.Point(903, 201);
+            this.tangentMapButton.Name = "tangentMapButton";
+            this.tangentMapButton.Size = new System.Drawing.Size(98, 23);
+            this.tangentMapButton.TabIndex = 10;
+            this.tangentMapButton.Text = "Save &Tangents";
+            this.tangentMapButton.UseVisualStyleBackColor = true;
+            this.tangentMapButton.Click += new System.EventHandler(this.tangentMapButton_Click);
+            // 
+            // overwriteCheckBox
+            // 
+            this.overwriteCheckBox.AutoSize = true;
+            this.overwriteCheckBox.Location = new System.Drawing.Point(903, 98);
+            this.overwriteCheckBox.Name = "overwriteCheckBox";
+            this.overwriteCheckBox.Size = new System.Drawing.Size(71, 17);
+            this.overwriteCheckBox.TabIndex = 5;
+            this.overwriteCheckBox.Text = "&Overwrite";
+            this.overwriteCheckBox.UseVisualStyleBackColor = true;
+            // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.Location = new System.Drawing.Point(12, 151);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(106, 13);
+            this.label4.TabIndex = 12;
+            this.label4.Text = "XWA Root Directory:";
+            // 
+            // xwaDirTextBox
+            // 
+            this.xwaDirTextBox.Location = new System.Drawing.Point(12, 167);
+            this.xwaDirTextBox.Name = "xwaDirTextBox";
+            this.xwaDirTextBox.Size = new System.Drawing.Size(885, 20);
+            this.xwaDirTextBox.TabIndex = 8;
+            // 
+            // xwaDirBrowserDialog
+            // 
+            this.xwaDirBrowserDialog.RootFolder = System.Environment.SpecialFolder.ProgramFilesX86;
+            // 
+            // selectXWADirButton
+            // 
+            this.selectXWADirButton.Location = new System.Drawing.Point(903, 165);
+            this.selectXWADirButton.Name = "selectXWADirButton";
+            this.selectXWADirButton.Size = new System.Drawing.Size(98, 23);
+            this.selectXWADirButton.TabIndex = 9;
+            this.selectXWADirButton.Text = "Select &Dir";
+            this.selectXWADirButton.UseVisualStyleBackColor = true;
+            this.selectXWADirButton.Click += new System.EventHandler(this.selectXWADirButton_Click);
             // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(991, 149);
+            this.ClientSize = new System.Drawing.Size(1015, 236);
+            this.Controls.Add(this.selectXWADirButton);
+            this.Controls.Add(this.label4);
+            this.Controls.Add(this.xwaDirTextBox);
+            this.Controls.Add(this.overwriteCheckBox);
+            this.Controls.Add(this.tangentMapButton);
             this.Controls.Add(this.smoothButton);
             this.Controls.Add(this.label3);
             this.Controls.Add(this.thresholdsTextBox);
@@ -147,7 +208,7 @@
             this.Controls.Add(this.inputFileButton);
             this.Controls.Add(this.inputFileTextBox);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
-            this.Margin = new System.Windows.Forms.Padding(1, 1, 1, 1);
+            this.Margin = new System.Windows.Forms.Padding(1);
             this.Name = "MainForm";
             this.Text = "OPT Smoother 1.0";
             this.ResumeLayout(false);
@@ -168,5 +229,11 @@
         private System.Windows.Forms.TextBox thresholdsTextBox;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Button smoothButton;
+        private System.Windows.Forms.Button tangentMapButton;
+        private System.Windows.Forms.CheckBox overwriteCheckBox;
+        private System.Windows.Forms.Label label4;
+        private System.Windows.Forms.TextBox xwaDirTextBox;
+        private System.Windows.Forms.FolderBrowserDialog xwaDirBrowserDialog;
+        private System.Windows.Forms.Button selectXWADirButton;
     }
 }
