@@ -140,7 +140,7 @@
             // 
             // tangentMapButton
             // 
-            this.tangentMapButton.Location = new System.Drawing.Point(903, 201);
+            this.tangentMapButton.Location = new System.Drawing.Point(903, 204);
             this.tangentMapButton.Name = "tangentMapButton";
             this.tangentMapButton.Size = new System.Drawing.Size(98, 23);
             this.tangentMapButton.TabIndex = 10;
@@ -192,7 +192,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1015, 236);
+            this.ClientSize = new System.Drawing.Size(1014, 240);
             this.Controls.Add(this.selectXWADirButton);
             this.Controls.Add(this.label4);
             this.Controls.Add(this.xwaDirTextBox);
@@ -208,9 +208,9 @@
             this.Controls.Add(this.inputFileButton);
             this.Controls.Add(this.inputFileTextBox);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
-            this.Margin = new System.Windows.Forms.Padding(1);
+            this.Margin = new System.Windows.Forms.Padding(1, 1, 1, 1);
             this.Name = "MainForm";
-            this.Text = "OPT Smoother 1.0";
+            this.Text = "OPT Smoother & Tangent Map Generator 1.1";
             this.ResumeLayout(false);
             this.PerformLayout();
 

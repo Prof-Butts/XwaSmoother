@@ -127,7 +127,7 @@ namespace XwaSmoother
             string sError = "";
             uint NumMeshes = SmootherEngine.ComputeTangentMap(inputFileTextBox.Text, outputFileTextBox.Text, out sError);
             if (sError.Length == 0)
-                MessageBox.Show(NumMeshes + " meshes processed", "Success", MessageBoxButtons.OK);
+                MessageBox.Show("Saved " + NumMeshes + " tangent maps", "Success", MessageBoxButtons.OK);
             else
                 MessageBox.Show(sError, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }

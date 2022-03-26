@@ -556,9 +556,9 @@ namespace XwaSmoother
                     if (sError.Length == 0)
                     {
                         string sTangentFileName = Path.Combine(sTangentDir, UniqueID.ToString("X") + ".tan");
-                        Console.WriteLine("OPTId: " + OPTId.ToString("X") + ", " +
-                            "OPTMeshId: " + OPTMeshId.ToString("X") + ", " +
-                            "UniqueID: " + UniqueID.ToString("X"));
+                        //Console.WriteLine("OPTId: " + OPTId.ToString("X") + ", " +
+                        //    "OPTMeshId: " + OPTMeshId.ToString("X") + ", " +
+                        //    "UniqueID: " + UniqueID.ToString("X"));
                         SaveTangentMap(VertexTangents, sTangentFileName);
                     } else
                     {
@@ -825,21 +825,6 @@ namespace XwaSmoother
             }
 
             return Smooth(sInFileName, sOutFileName, Thresholds);
-        }
-
-        public static void Test(string sInFileName, string sOutFileName)
-        {
-            var opt = OptFile.FromFile(sInFileName);
-            Console.WriteLine("Loaded: " + sInFileName);
-            for (int meshIdx = 0; meshIdx < opt.Meshes.Count; meshIdx++)
-            {
-                var mesh = opt.Meshes[meshIdx];
-                Console.WriteLine("meshIdx: " + meshIdx);
-                Console.WriteLine("Descriptor MeshType: " + mesh.Descriptor.MeshType); // MainHull, Default, etc...
-                mesh.Descriptor.TargetId = meshIdx;
-                Console.WriteLine("Descriptor.Target: " + mesh.Descriptor.Target + ", " + mesh.Descriptor.TargetId);
-            }
-            opt.Save(sOutFileName);
         }
     }
 }
