@@ -110,35 +110,5 @@ namespace XwaSmoother
             MessageBox.Show(NumMeshes + " meshes smoothed", "Success", MessageBoxButtons.OK);
         }
 
-        private void tangentMapButton_Click(object sender, EventArgs e)
-        {
-            // Input validation
-            if (xwaDirTextBox.Text.Trim().Length == 0)
-            {
-                MessageBox.Show("Select the XWA root directory first", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-            SmootherEngine.sXwaRootDirectory = xwaDirTextBox.Text;
-
-            if (!ValidateInputOutputTextBoxes())
-                return;
-
-            string sError = "";
-            uint NumMeshes = SmootherEngine.ComputeTangentMap(inputFileTextBox.Text, outputFileTextBox.Text, out sError);
-            if (sError.Length == 0)
-                MessageBox.Show("Saved " + NumMeshes + " tangent maps", "Success", MessageBoxButtons.OK);
-            else
-                MessageBox.Show(sError, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-
-        private void selectXWADirButton_Click(object sender, EventArgs e)
-        {
-            if (xwaDirBrowserDialog.ShowDialog() == DialogResult.OK)
-            {
-                xwaDirTextBox.Text = xwaDirBrowserDialog.SelectedPath;
-                SmootherEngine.sXwaRootDirectory = xwaDirTextBox.Text;
-            }
-        }
     }
 }
