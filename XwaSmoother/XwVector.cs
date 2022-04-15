@@ -33,7 +33,7 @@ namespace XwaOpter
 
         public override string ToString()
         {
-            return string.Format(CultureInfo.InvariantCulture, "{0:R} ; {1:R} ; {2:R}", this.x, this.y, this.z);
+            return string.Format(CultureInfo.InvariantCulture, "{0:R}, {1:R}, {2:R}", this.x, this.y, this.z);
         }
 
         public void SetMaxFloat()

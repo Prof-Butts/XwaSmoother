@@ -42,6 +42,7 @@
             this.smoothButton = new System.Windows.Forms.Button();
             this.overwriteCheckBox = new System.Windows.Forms.CheckBox();
             this.xwaDirBrowserDialog = new System.Windows.Forms.FolderBrowserDialog();
+            this.BVHButton = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // inputFileTextBox
@@ -148,11 +149,22 @@
             // 
             this.xwaDirBrowserDialog.RootFolder = System.Environment.SpecialFolder.ProgramFilesX86;
             // 
+            // BVHButton
+            // 
+            this.BVHButton.Location = new System.Drawing.Point(902, 154);
+            this.BVHButton.Name = "BVHButton";
+            this.BVHButton.Size = new System.Drawing.Size(98, 23);
+            this.BVHButton.TabIndex = 8;
+            this.BVHButton.Text = "&BVH";
+            this.BVHButton.UseVisualStyleBackColor = true;
+            this.BVHButton.Click += new System.EventHandler(this.BVHButton_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1012, 156);
+            this.ClientSize = new System.Drawing.Size(1012, 197);
+            this.Controls.Add(this.BVHButton);
             this.Controls.Add(this.overwriteCheckBox);
             this.Controls.Add(this.smoothButton);
             this.Controls.Add(this.label3);
@@ -164,7 +176,7 @@
             this.Controls.Add(this.inputFileButton);
             this.Controls.Add(this.inputFileTextBox);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
-            this.Margin = new System.Windows.Forms.Padding(1, 1, 1, 1);
+            this.Margin = new System.Windows.Forms.Padding(1);
             this.Name = "MainForm";
             this.Text = "OPT Smoother & Tangent Map Generator 1.1";
             this.ResumeLayout(false);
@@ -187,5 +199,6 @@
         private System.Windows.Forms.Button smoothButton;
         private System.Windows.Forms.CheckBox overwriteCheckBox;
         private System.Windows.Forms.FolderBrowserDialog xwaDirBrowserDialog;
+        private System.Windows.Forms.Button BVHButton;
     }
 }

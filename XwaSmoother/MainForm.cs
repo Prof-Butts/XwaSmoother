@@ -47,10 +47,9 @@ namespace XwaSmoother
             }
         }
 
-        private bool ValidateInputOutputTextBoxes()
+        private bool ValidateInputTextBox()
         {
             string sInFileName = inputFileTextBox.Text;
-            string sOutFileName = outputFileTextBox.Text;
 
             if (sInFileName.Length == 0)
             {
@@ -63,6 +62,16 @@ namespace XwaSmoother
                 MessageBox.Show("File: " + sInFileName + ", does not exist", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return false;
             }
+
+            return true;
+        }
+
+        private bool ValidateInputOutputTextBoxes()
+        {
+            string sOutFileName = outputFileTextBox.Text;
+
+            if (!ValidateInputTextBox())
+                return false;
 
             if (sOutFileName.Length == 0)
             {
@@ -110,5 +119,24 @@ namespace XwaSmoother
             MessageBox.Show(NumMeshes + " meshes smoothed", "Success", MessageBoxButtons.OK);
         }
 
+        private void BVHButton_Click(object sender, EventArgs e)
+        {
+            string sInFileName = inputFileTextBox.Text;
+            string sError = "";
+
+            if (!ValidateInputTextBox())
+                return;
+
+            string sInPath = Path.GetDirectoryName(sInFileName);
+            string sOutFileName = Path.GetFileNameWithoutExtension(sInFileName);
+            sOutFileName = Path.Combine(sInPath, sOutFileName + ".bvh");
+
+            LBVH.ComputeBVH(sInFileName, sOutFileName, out sError);
+            if (sError.Length > 0)
+            {
+                MessageBox.Show(sError, "Error", MessageBoxButtons.OK);
+                return;
+            }
+        }
     }
 }
