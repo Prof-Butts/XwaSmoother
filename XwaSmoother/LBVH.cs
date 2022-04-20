@@ -462,23 +462,29 @@ namespace XwaSmoother
             PrintTree(level + "    ", T.left);
         }
 
-        private static AABB Refit(TreeNode T, in List<BoxRef> boxes)
+        private static AABB Refit(TreeNode T, in List<BoxRef> boxes, out int NumTreeNodes)
         {
             if (T == null)
+            {
+                NumTreeNodes = 0;
                 return null;
+            }
 
             if (T.boxRefIdx != -1)
             {
                 T.box.MakeInvalid();
                 T.box.Expand(boxes[T.boxRefIdx].box);
+                NumTreeNodes = 1;
                 return T.box;
             }
 
-            AABB boxL = Refit(T.left, boxes);
-            AABB boxR = Refit(T.right, boxes);
+            int NodesLeft, NodesRight;
+            AABB boxL = Refit(T.left, boxes, out NodesLeft);
+            AABB boxR = Refit(T.right, boxes, out NodesRight);
             T.box.MakeInvalid();
             if (T.left != null) T.box.Expand(boxL);
             if (T.right != null) T.box.Expand(boxR);
+            NumTreeNodes = 1 + NodesLeft + NodesRight;
             return T.box;
         }
 
@@ -823,13 +829,14 @@ namespace XwaSmoother
             // Build the tree proper
             TreeNode T = BuildLBVH(Boxes, 0, numPrims - 1);
             // Compute the inner nodes' AABBs
-            Refit(T, Boxes);
+            int NumTreeNodes = 0;
+            Refit(T, Boxes, out NumTreeNodes);
             //PrintTree("", T);
             // DEBUG, let's dump the BVH tree structure
             //SaveBVHToOBJ("c:\\temp\\LBVH.obj", T);
 
             // Save the tree and the primitives
-            SaveBVH(sOutFileName, T, Boxes, Vertices, Indices, out sError);
+            SaveBVH(sOutFileName, NumTreeNodes, T, Vertices, Indices, out sError);
             Console.WriteLine("Saved: " + sOutFileName);
 
             // Tidy up
@@ -837,7 +844,7 @@ namespace XwaSmoother
             T = null;
         }
 
-        private static void SaveBVH(string sOutFileName, TreeNode T, List<BoxRef> Boxes, List<Vector> Vertices, List<int> Indices, out string sError)
+        private static void SaveBVH(string sOutFileName, int NumTreeNodes, TreeNode T, List<Vector> Vertices, List<int> Indices, out string sError)
         {
             System.IO.BinaryWriter file = new BinaryWriter(File.OpenWrite(sOutFileName));
             sError = "";
@@ -890,16 +897,19 @@ namespace XwaSmoother
 
             // Save the LBVH
             {
-                SaveLBVH(file, T);
+                SaveLBVH(file, NumTreeNodes, T);
             }
 
             file.Close();
         }
 
-        private static void SaveLBVH(BinaryWriter file, IGenericTree root)
+        private static void SaveLBVH(BinaryWriter file, int NumTreeNodes, IGenericTree root)
         {
             if (root == null)
                 return;
+
+            // Write the number of nodes in the tree
+            file.Write(NumTreeNodes);
 
             // A breadth-first traversal will ensure that each level of the tree is written to disk
             // before advancing to the next level. We can thus keep track of the offset in the file
@@ -909,8 +919,9 @@ namespace XwaSmoother
             // Initialize the queue and the offsets. Note that the offsets are relative to the
             // on-disk beginning of the LBVH -- not absolute offsets from the beginning of the file.
             Q.Enqueue(root);
-            int sizeofNode = ENCODED_TREE_NODE_SIZE;
-            int nextNode = sizeofNode;
+            // Since we're going to put this data in an array, it's easier to specify the children
+            // offsets as indices into this array.
+            int nextNode = 1;
 
             while (Q.Count != 0)
             {
@@ -921,14 +932,14 @@ namespace XwaSmoother
                 file.Write(
                     BVHEncoder.EncodeTreeNode((TreeNode)T,
                         children.Count > 0 ? nextNode : -1,
-                        children.Count > 1 ? nextNode + sizeofNode : -1)
+                        children.Count > 1 ? nextNode + 1 : -1)
                 );
 
                 // Enqueue the children
                 foreach (var child in children)
                 {
                     Q.Enqueue(child);
-                    nextNode += sizeofNode;
+                    nextNode++;
                 }
             }
         }
