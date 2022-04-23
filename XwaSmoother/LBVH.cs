@@ -859,9 +859,14 @@ namespace XwaSmoother
             // Save the vertices
             {
                 // Write the number of vertices
-                UInt32 NumTangents = (UInt32)Vertices.Count;
-                file.Write(NumTangents);
+                UInt32 NumVertices = (UInt32)Vertices.Count;
+                file.Write(NumVertices);
 
+#if DEBUG
+                Console.WriteLine("NumVertices: " + NumVertices);
+                Console.WriteLine(String.Format("Vertex[0]: {0}, {1}, {2}",
+                    Vertices[0].X, Vertices[0].Y, Vertices[0].Z));
+#endif
                 // Write the vertices
                 float[] data = new float[3 * Vertices.Count];
                 int ofs = 0;
@@ -883,6 +888,12 @@ namespace XwaSmoother
                 UInt32 NumIndices = (UInt32)Indices.Count;
                 file.Write(NumIndices);
 
+#if DEBUG
+                Console.WriteLine("NumIndices: " + NumIndices);
+                Console.WriteLine(String.Format("Indices[0,1,2]: {0}, {1}, {2}",
+                    Indices[0], Indices[1], Indices[2]));
+#endif
+
                 // Write the indices
                 int[] data = new int[Indices.Count];
                 int ofs = 0;
@@ -903,14 +914,36 @@ namespace XwaSmoother
             file.Close();
         }
 
-        private static void SaveLBVH(BinaryWriter file, int NumTreeNodes, IGenericTree root)
+        private static void SaveLBVH(BinaryWriter file, int NumNodes, IGenericTree root)
         {
             if (root == null)
                 return;
 
             // Write the number of nodes in the tree
-            file.Write(NumTreeNodes);
+            file.Write(NumNodes);
 
+#if DEBUG
+            {
+                Console.WriteLine(String.Format("NumNodes: {0}", NumNodes));
+                TreeNode T = (TreeNode)root;
+
+                Console.WriteLine(String.Format("root: ref: {0}", T.boxRefIdx));
+                Console.WriteLine(String.Format("min: {0},{1},{2}",
+                    T.box.min.x, T.box.min.y, T.box.min.z));
+                Console.WriteLine(String.Format("max: {0},{1},{2}",
+                    T.box.max.x, T.box.max.y, T.box.max.z));
+
+                T = T.left;
+                if (T != null)
+                {
+                    Console.WriteLine("Left child: ");
+                    Console.WriteLine(String.Format("min: {0},{1},{2}",
+                        T.box.min.x, T.box.min.y, T.box.min.z));
+                    Console.WriteLine(String.Format("max: {0},{1},{2}",
+                        T.box.max.x, T.box.max.y, T.box.max.z));
+                }
+            }
+#endif
             // A breadth-first traversal will ensure that each level of the tree is written to disk
             // before advancing to the next level. We can thus keep track of the offset in the file
             // where the next node will appear.
