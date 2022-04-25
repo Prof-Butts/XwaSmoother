@@ -76,21 +76,21 @@ namespace XwaSmoother
     public class BoxRef : IComparable<BoxRef>
     {
         public AABB box;
-        public int triref;
+        public int TriID;
         public MortonCode_t code;
         public Vector centroid;
 
         public BoxRef()
         {
             box = null;
-            triref = -1;
+            TriID = -1;
             code = 0;
         }
 
         public BoxRef(BoxRef boxref)
         {
             this.box = boxref.box;
-            this.triref = boxref.triref;
+            this.TriID = boxref.TriID;
             this.code = boxref.code;
         }
 
@@ -185,19 +185,20 @@ namespace XwaSmoother
     {
         bool IsLeaf();
         List<IGenericTree> GetChildren();
+        IGenericTree GetParent();
     }
 
     public class TreeNode : IGenericTree
     {
         public int boxRefIdx;
-        public TreeNode left, right;
+        public TreeNode left, right, parent;
         public AABB box;
         public MortonCode_t code;
 
         public TreeNode()
         {
             boxRefIdx = -1;
-            left = right = null;
+            left = right = parent = null;
             box = new AABB();
             code = 0;
         }
@@ -205,7 +206,7 @@ namespace XwaSmoother
         public TreeNode(int boxRefIdx)
         {
             this.boxRefIdx = boxRefIdx;
-            left = right = null;
+            left = right = parent = null;
             box = new AABB();
             code = 0;
         }
@@ -214,7 +215,7 @@ namespace XwaSmoother
         {
             this.boxRefIdx = boxRefIdx;
             this.code = code;
-            left = right = null;
+            left = right = parent = null;
             box = new AABB();
         }
 
@@ -223,6 +224,17 @@ namespace XwaSmoother
             this.boxRefIdx = boxRefIdx;
             this.left = left;
             this.right = right;
+            this.parent = null;
+            this.box = new AABB();
+            this.code = 0;
+        }
+
+        public TreeNode(int boxRefIdx, TreeNode left, TreeNode right, TreeNode parent)
+        {
+            this.boxRefIdx = boxRefIdx;
+            this.left = left;
+            this.right = right;
+            this.parent = parent;
             this.box = new AABB();
             this.code = 0;
         }
@@ -232,6 +244,7 @@ namespace XwaSmoother
             this.boxRefIdx = boxRefIdx;
             this.left = null;
             this.right = null;
+            this.parent = null;
             this.code = 0;
             this.box = new AABB();
             this.box.Expand(box);
@@ -250,6 +263,11 @@ namespace XwaSmoother
             if (this.right != null)
                 List.Add(this.right);
             return List;
+        }
+
+        public IGenericTree GetParent()
+        {
+            return this.parent;
         }
     }
 
@@ -482,8 +500,16 @@ namespace XwaSmoother
             AABB boxL = Refit(T.left, boxes, out NodesLeft);
             AABB boxR = Refit(T.right, boxes, out NodesRight);
             T.box.MakeInvalid();
-            if (T.left != null) T.box.Expand(boxL);
-            if (T.right != null) T.box.Expand(boxR);
+            if (T.left != null)
+            {
+                T.box.Expand(boxL);
+                T.left.parent = T;
+            }
+            if (T.right != null)
+            {
+                T.box.Expand(boxR);
+                T.right.parent = T;
+            }
             NumTreeNodes = 1 + NodesLeft + NodesRight;
             return T.box;
         }
@@ -653,7 +679,7 @@ namespace XwaSmoother
             int split_idx = -1;
             
             if (i == j)
-                return new TreeNode(boxes[i].triref, boxes[i].code);
+                return new TreeNode(boxes[i].TriID, boxes[i].code);
 
             int fbh = delta32(boxes[i].code, boxes[j].code);
             if (fbh == -1)
@@ -735,7 +761,7 @@ namespace XwaSmoother
 
                             // Update the current box
                             boxref = new BoxRef();
-                            boxref.triref = TriId++;
+                            boxref.TriID = TriId++;
                             boxref.box = new AABB();
                             boxref.box.Expand(Vertices[Indices[NumIndices - 3]]);
                             boxref.box.Expand(Vertices[Indices[NumIndices - 2]]);
@@ -755,7 +781,7 @@ namespace XwaSmoother
 
                                 // Update the current box
                                 boxref = new BoxRef();
-                                boxref.triref = TriId++;
+                                boxref.TriID = TriId++;
                                 boxref.box = new AABB();
                                 boxref.box.Expand(Vertices[Indices[NumIndices - 3]]);
                                 boxref.box.Expand(Vertices[Indices[NumIndices - 2]]);
@@ -829,14 +855,16 @@ namespace XwaSmoother
             // Build the tree proper
             TreeNode T = BuildLBVH(Boxes, 0, numPrims - 1);
             // Compute the inner nodes' AABBs
-            int NumTreeNodes = 0;
-            Refit(T, Boxes, out NumTreeNodes);
-            //PrintTree("", T);
+            int NumNodes = 0;
+            Refit(T, Boxes, out NumNodes);
+#if DEBUG
+            PrintTree("", T);
+#endif
             // DEBUG, let's dump the BVH tree structure
             //SaveBVHToOBJ("c:\\temp\\LBVH.obj", T);
 
             // Save the tree and the primitives
-            SaveBVH(sOutFileName, NumTreeNodes, T, Vertices, Indices, out sError);
+            SaveBVH(sOutFileName, NumNodes, T, Vertices, Indices, out sError);
             Console.WriteLine("Saved: " + sOutFileName);
 
             // Tidy up
@@ -844,7 +872,7 @@ namespace XwaSmoother
             T = null;
         }
 
-        private static void SaveBVH(string sOutFileName, int NumTreeNodes, TreeNode T, List<Vector> Vertices, List<int> Indices, out string sError)
+        private static void SaveBVH(string sOutFileName, int NumNodes, TreeNode T, List<Vector> Vertices, List<int> Indices, out string sError)
         {
             System.IO.BinaryWriter file = new BinaryWriter(File.OpenWrite(sOutFileName));
             sError = "";
@@ -908,7 +936,7 @@ namespace XwaSmoother
 
             // Save the LBVH
             {
-                SaveLBVH(file, NumTreeNodes, T);
+                SaveLBVH(file, NumNodes, T);
             }
 
             file.Close();
