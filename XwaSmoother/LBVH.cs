@@ -154,17 +154,16 @@ namespace XwaSmoother
             return ofs;
         }
 
-        public static unsafe byte[] EncodeTreeNode(TreeNode T, Int32 left, Int32 right)
+        public static unsafe byte[] EncodeTreeNode(TreeNode T, Int32 parent, Int32 left, Int32 right)
         {
             byte[] data = new byte[LBVH.ENCODED_TREE_NODE_SIZE];
             int ofs = 0;
-            Int32 padding = 0;
             fixed (byte *dst = &data[0])
             {
                 ofs = EncodeInt32(dst, ofs, T.boxRefIdx);
                 ofs = EncodeInt32(dst, ofs, left);
                 ofs = EncodeInt32(dst, ofs, right);
-                ofs = EncodeInt32(dst, ofs, padding);
+                ofs = EncodeInt32(dst, ofs, parent);
                 // 16 bytes
                 ofs = EncodeXwVector(dst, ofs, T.box.min);
                 // 16 bytes
@@ -226,6 +225,16 @@ namespace XwaSmoother
             this.right = right;
             this.parent = null;
             this.box = new AABB();
+            this.code = 0;
+        }
+
+        public TreeNode(int boxRefIdx, AABB box, TreeNode left, TreeNode right)
+        {
+            this.boxRefIdx = boxRefIdx;
+            this.left = left;
+            this.right = right;
+            this.parent = null;
+            this.box = box;
             this.code = 0;
         }
 
@@ -473,10 +482,13 @@ namespace XwaSmoother
             if (T == null)
                 return;
             PrintTree(level + "    ", T.right);
+            Console.WriteLine(level + T.boxRefIdx);
+            /*
             if (T.boxRefIdx == -1)
                 Console.WriteLine(level + T.boxRefIdx);
             else
                 Console.WriteLine(level + T.boxRefIdx + "-" + to_binary(T.code, 3));
+            */
             PrintTree(level + "    ", T.left);
         }
 
@@ -496,9 +508,9 @@ namespace XwaSmoother
                 return T.box;
             }
 
-            int NodesLeft, NodesRight;
-            AABB boxL = Refit(T.left, boxes, out NodesLeft);
-            AABB boxR = Refit(T.right, boxes, out NodesRight);
+            int NumNodesL, NumNodesR;
+            AABB boxL = Refit(T.left, boxes, out NumNodesL);
+            AABB boxR = Refit(T.right, boxes, out NumNodesR);
             T.box.MakeInvalid();
             if (T.left != null)
             {
@@ -510,8 +522,19 @@ namespace XwaSmoother
                 T.box.Expand(boxR);
                 T.right.parent = T;
             }
-            NumTreeNodes = 1 + NodesLeft + NodesRight;
+            NumTreeNodes = 1 + NumNodesL + NumNodesR;
             return T.box;
+        }
+
+        private static int CountNodes(TreeNode T)
+        {
+            if (T == null)
+                return 0;
+
+            if (T.boxRefIdx != -1)
+                return 1;
+
+            return 1 + CountNodes(T.left) + CountNodes(T.right);
         }
 
         public static void SaveOBJ(string sOutFileName, List<Vector> Vertices, List<int> Indices)
@@ -533,9 +556,36 @@ namespace XwaSmoother
             file.Close();
         }
 
+        private static int SaveTriangleToOBJ(StreamWriter file, string name, int TriID, int vertOfs,
+            in List<Vector> Vertices, in List<int> Indices)
+        {
+            if (name != null)
+                file.WriteLine("o " + name);
+
+            // Write the vertices
+            for (int i = 0; i < 3; i++)
+            {
+                int ofs = TriID * 3 + i;
+                Vector V = Vertices[Indices[ofs]];
+                file.WriteLine(String.Format("v {0} {1} {2}",
+                    V.X * OPT_TO_METERS, V.Y * OPT_TO_METERS, V.Z * OPT_TO_METERS));
+            }
+            file.WriteLine();
+
+            // Write the face
+            file.WriteLine(String.Format("f {0} {1} {2}",
+                // OBJ files use indices that are 1-based, so we add +1,2,3 here, instead of
+                // 0,1,2
+                vertOfs + 1, vertOfs + 2, vertOfs + 3));
+            file.WriteLine();
+
+            return vertOfs + 3;
+        }
+
         private static int SaveAABBToOBJ(StreamWriter file, string name, AABB box, int vertOfs)
         {
-            file.WriteLine("o " + name);
+            if (name != null)
+                file.WriteLine("o " + name);
 
             file.WriteLine(String.Format("v {0} {1} {2}",
                 box.min.x * OPT_TO_METERS, box.min.y * OPT_TO_METERS, box.min.z * OPT_TO_METERS));
@@ -602,6 +652,63 @@ namespace XwaSmoother
         {
             StreamWriter file = new StreamWriter(sOutFileName);
             _SaveBVHToOBJ(file, T, 0);
+            file.Close();
+        }
+
+        private struct QNode
+        {
+            public TreeNode T;
+            public int level;
+
+            public QNode(TreeNode T, int level)
+            {
+                this.T = T;
+                this.level = level;
+            }
+        }
+
+        /// <summary>
+        /// Saves the given tree to an OBJ file using a bread-first search. This makes one OBJ
+        /// object per level.
+        /// </summary>
+        /// <param name="file"></param>
+        /// <param name="root"></param>
+        /// <param name="vertOfs"></param>
+        /// <param name="vertices"></param>
+        /// <param name="indices"></param>
+        /// <returns></returns>
+        private static int _SaveBVHToOBJ(StreamWriter file, TreeNode root, int vertOfs,
+            in List<Vector> vertices, in List<Int32> indices)
+        {
+            int prev_level = -1;
+            Queue<QNode> Q = new Queue<QNode>();
+            Q.Enqueue(new QNode(root, 0));
+            while (Q.Count > 0)
+            {
+                QNode qnode = Q.Dequeue();
+                TreeNode T = qnode.T;
+                // Start a new OBJ object if we jumped to a new level
+                if (prev_level != qnode.level)
+                {
+                    file.WriteLine("o Level-" + qnode.level);
+                    prev_level = qnode.level;
+                }
+
+                vertOfs = SaveAABBToOBJ(file, null, T.box, vertOfs);
+                if (T.IsLeaf())
+                    vertOfs = SaveTriangleToOBJ(file, null, T.boxRefIdx, vertOfs, vertices, indices);
+
+                foreach (TreeNode child in T.GetChildren())
+                    Q.Enqueue(new QNode(child, qnode.level + 1));
+            }
+            return vertOfs;
+        }
+
+        public static void SaveBVHToOBJ(string sOutFileName, TreeNode T,
+            in List<Vector> vertices, in List<Int32> indices)
+        {
+            StreamWriter file = new StreamWriter(sOutFileName);
+            _SaveBVHToOBJ(file, T, 0, vertices, indices);
             file.Close();
         }
 
@@ -706,6 +813,117 @@ namespace XwaSmoother
                 -1,
                 BuildLBVH(boxes, i, split_idx),
                 BuildLBVH(boxes, split_idx + 1, j)
+            );
+        }
+
+        /// <summary>
+        /// Naive implementation of the SBVH minus triangle splitting.
+        /// In other words, sort along the longest axis at each level.
+        /// </summary>
+        /// <param name="boxes">Unsorted AABBs</param>
+        /// <param name="leftIdx">Left index of the range to process</param>
+        /// <param name="rightIdx">Right index of the range to process</param>
+        /// <returns>A binary tree that represents the LBVH. All internal nodes will be missing AABBs,
+        /// so this tree must be refit later.</returns>
+        private static TreeNode BuildSBVH(ref List<BoxRef> boxes, in int leftIdx, in int rightIdx)
+        {
+            //int split_idx = -1;
+            if (leftIdx == rightIdx)
+                return new TreeNode(boxes[leftIdx].TriID, boxes[leftIdx].code);
+
+            if (leftIdx + 1 == rightIdx)
+            {
+                return new TreeNode(-1,
+                    new TreeNode(boxes[leftIdx].TriID, boxes[leftIdx].code),
+                    new TreeNode(boxes[rightIdx].TriID, boxes[rightIdx].code));
+            }
+
+            // Get the bounding box for this range
+            AABB rangeBox = new AABB();
+            for (int idx = leftIdx; idx <= rightIdx; idx++)
+                rangeBox.Expand(boxes[idx].box.GetCentroid());
+            XwVector range = XwVector.Substract(rangeBox.max, rangeBox.min);
+
+#if DISABLED
+            Console.WriteLine("i: " + leftIdx + ", j: " + rightIdx + ", rangeBox: " + rangeBox);
+            Console.WriteLine("range: " + range);
+#endif
+
+            // Find the longest axis
+            //BoxRefComparer comparer = new BoxRefComparer();
+            //comparer.axis = -1;
+            int axis = -1;
+            float max = -1.0f;
+            for (int idx = 0; idx < 3; idx++)
+                if (range[idx] > max)
+                {
+                    max = range[idx];
+                    //comparer.axis = idx;
+                    axis = idx;
+                }
+
+#if DISABLED
+            Console.WriteLine("max: " + max + ", axis: " + comparer.axis);
+            Console.WriteLine("Boxes before sorting:");
+            for (int i = leftIdx; i <= rightIdx; i++)
+            {
+                Console.Write(boxes[i].TriID + ":(" + boxes[i].centroid + "), ");
+            }
+            Console.WriteLine();
+#endif
+            // Sort along the maximum axis
+            //boxes.Sort(leftIdx, rightIdx - leftIdx + 1, comparer);
+            // Get the split position:
+            //split_idx = (leftIdx + rightIdx) / 2;
+
+            // Find the "median point" along the longest axis. I would call this the
+            // geometric middle point, but literature disagrees, so whatever.
+            float mid = rangeBox.min[axis] + range[axis] / 2.0f;
+            List<BoxRef> leftBoxes = new List<BoxRef>();
+            List<BoxRef> rightBoxes = new List<BoxRef>();
+            // Classify each box in the interval into either the left or right sub-range
+            for (int i = leftIdx; i <= rightIdx; i++)
+            {
+                BoxRef boxRef = boxes[i];
+                XwVector centroid = boxRef.box.GetCentroid();
+                if (centroid[axis] <= mid)
+                    leftBoxes.Add(boxRef);
+                else
+                    rightBoxes.Add(boxRef);
+            }
+
+            // Check
+            if ((leftBoxes.Count + rightBoxes.Count) != (rightIdx - leftIdx + 1))
+                throw new Exception("left/right boxes count mismatch");
+
+            int split_idx = leftIdx + leftBoxes.Count;
+
+            // Write back the left/right sub ranges into the original boxes List
+            int destIdx = leftIdx;
+            foreach (BoxRef boxRef in leftBoxes)
+                boxes[destIdx++] = boxRef;
+            foreach (BoxRef boxRef in rightBoxes)
+                boxes[destIdx++] = boxRef;
+
+            // Check
+            if (destIdx != rightIdx + 1)
+                throw new Exception("destIdx is in the wrong position after the writeback");
+
+#if DISABLED
+            Console.WriteLine("Boxes after sorting:");
+            for (int i = leftIdx; i <= rightIdx; i++)
+            {
+                Console.Write(boxes[i].TriID + ":(" + boxes[i].centroid + "), ");
+            }
+            Console.WriteLine();
+            Console.WriteLine("split_idx: " + split_idx);
+#endif
+
+            return new TreeNode(
+                -1,
+                rangeBox,
+                BuildSBVH(ref boxes, leftIdx, split_idx - 1),
+                BuildSBVH(ref boxes, split_idx, rightIdx)
             );
         }
 
@@ -819,7 +1037,7 @@ namespace XwaSmoother
             }
 
             // Checkpoint: save an OBJ file and check that everything looks fine
-            //SaveOBJ("c:\\Temp\\LBVHInput.obj", Vertices, Indices);
+            SaveOBJ("c:\\Temp\\LBVHInput.obj", Vertices, Indices);
 
             // Sort the primitives by their Morton codes
             Boxes.Sort();
@@ -853,15 +1071,20 @@ namespace XwaSmoother
             */
 
             // Build the tree proper
-            TreeNode T = BuildLBVH(Boxes, 0, numPrims - 1);
+            //TreeNode T = BuildLBVH(Boxes, 0, numPrims - 1);
             // Compute the inner nodes' AABBs
-            int NumNodes = 0;
-            Refit(T, Boxes, out NumNodes);
+            // TODO: The refit is buggy: it's messing up the inner nodes AABBs for some reason
+            //int NumNodes = 0;
+            //Refit(T, Boxes, out NumNodes);
+
+            TreeNode T = BuildSBVH(ref Boxes, 0, numPrims - 1);
+            int NumNodes = CountNodes(T);
 #if DEBUG
-            PrintTree("", T);
+            //PrintTree("", T);
 #endif
             // DEBUG, let's dump the BVH tree structure
-            //SaveBVHToOBJ("c:\\temp\\LBVH.obj", T);
+            SaveBVHToOBJ("c:\\temp\\LBVH.obj", T, Vertices, Indices);
+            SaveOBJ("c:\\Temp\\LBVHInput-after-sort.obj", Vertices, Indices);
 
             // Save the tree and the primitives
             SaveBVH(sOutFileName, NumNodes, T, Vertices, Indices, out sError);
@@ -991,7 +1214,7 @@ namespace XwaSmoother
 
                 // In a breadth-first search, the left child will always be at offset nextNode
                 file.Write(
-                    BVHEncoder.EncodeTreeNode((TreeNode)T,
+                    BVHEncoder.EncodeTreeNode((TreeNode)T, 0 /* parent (TODO) */,
                         children.Count > 0 ? nextNode : -1,
                         children.Count > 1 ? nextNode + 1 : -1)
                 );
