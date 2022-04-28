@@ -144,7 +144,7 @@ namespace XwaSmoother
             return ofs + 4;
         }
 
-        public static unsafe int EncodeXwVector(byte* dst, int ofs, XwVector V)
+        public static unsafe int EncodeXwVector4(byte* dst, int ofs, XwVector V)
         {
             float w = 1.0f;
             ofs = EncodeFloat(dst, ofs, V.x);
@@ -152,6 +152,27 @@ namespace XwaSmoother
             ofs = EncodeFloat(dst, ofs, V.z);
             ofs = EncodeFloat(dst, ofs, w); // Padding to get 4 32-bit dwords
             return ofs;
+        }
+
+        public static unsafe int EncodeXwVector3(byte* dst, int ofs, XwVector V)
+        {
+            float w = 1.0f;
+            ofs = EncodeFloat(dst, ofs, V.x);
+            ofs = EncodeFloat(dst, ofs, V.y);
+            ofs = EncodeFloat(dst, ofs, V.z);
+            return ofs;
+        }
+
+        public static unsafe byte[] EncodeAABB(in AABB aabb)
+        {
+            byte[] data = new byte[sizeof(float) * 3 * 2];
+            int ofs = 0;
+            fixed (byte* dst = &data[0])
+            {
+                ofs = EncodeXwVector3(dst, ofs, aabb.min);
+                ofs = EncodeXwVector3(dst, ofs, aabb.max);
+            }
+            return data;
         }
 
         public static unsafe byte[] EncodeTreeNode(TreeNode T, Int32 parent, Int32 left, Int32 right)
@@ -165,9 +186,9 @@ namespace XwaSmoother
                 ofs = EncodeInt32(dst, ofs, right);
                 ofs = EncodeInt32(dst, ofs, parent);
                 // 16 bytes
-                ofs = EncodeXwVector(dst, ofs, T.box.min);
+                ofs = EncodeXwVector4(dst, ofs, T.box.min);
                 // 16 bytes
-                ofs = EncodeXwVector(dst, ofs, T.box.max);
+                ofs = EncodeXwVector4(dst, ofs, T.box.max);
                 // 16 bytes
             }
 
@@ -827,27 +848,138 @@ namespace XwaSmoother
         /// so this tree must be refit later.</returns>
         private static TreeNode BuildSBVH(ref List<BoxRef> boxes, in int leftIdx, in int rightIdx)
         {
-            //int split_idx = -1;
+            int split_idx = -1;
             if (leftIdx == rightIdx)
-                return new TreeNode(boxes[leftIdx].TriID, boxes[leftIdx].code);
+                return new TreeNode(boxes[leftIdx].TriID, boxes[leftIdx].box);
 
             if (leftIdx + 1 == rightIdx)
             {
+                AABB box = new AABB();
+                box.Expand(boxes[leftIdx].box);
+                box.Expand(boxes[rightIdx].box);
                 return new TreeNode(-1,
-                    new TreeNode(boxes[leftIdx].TriID, boxes[leftIdx].code),
-                    new TreeNode(boxes[rightIdx].TriID, boxes[rightIdx].code));
+                    box,
+                    new TreeNode(boxes[leftIdx].TriID, boxes[leftIdx].box),
+                    new TreeNode(boxes[rightIdx].TriID, boxes[rightIdx].box));
             }
 
             // Get the bounding box for this range
+            AABB centroidRangeBox = new AABB();
             AABB rangeBox = new AABB();
             for (int idx = leftIdx; idx <= rightIdx; idx++)
-                rangeBox.Expand(boxes[idx].box.GetCentroid());
+            {
+                centroidRangeBox.Expand(boxes[idx].box.GetCentroid());
+                rangeBox.Expand(boxes[idx].box);
+            }
+            XwVector centroidRange = XwVector.Substract(centroidRangeBox.max, centroidRangeBox.min);
             XwVector range = XwVector.Substract(rangeBox.max, rangeBox.min);
 
 #if DISABLED
             Console.WriteLine("i: " + leftIdx + ", j: " + rightIdx + ", rangeBox: " + rangeBox);
             Console.WriteLine("range: " + range);
 #endif
+
+            // Find the longest axis
+            int axis = -1;
+            float max = -1.0f;
+            for (int idx = 0; idx < 3; idx++)
+                if (centroidRange[idx] > max)
+                {
+                    max = centroidRange[idx];
+                    //max = range[idx];
+                    axis = idx;
+                }
+
+#if DISABLED
+            Console.WriteLine("max: " + max + ", axis: " + comparer.axis);
+            Console.WriteLine("Boxes before sorting:");
+            for (int i = leftIdx; i <= rightIdx; i++)
+            {
+                Console.Write(boxes[i].TriID + ":(" + boxes[i].centroid + "), ");
+            }
+            Console.WriteLine();
+#endif
+            /*
+            // Sort along the maximum axis
+            BoxRefComparer comparer = new BoxRefComparer();
+            comparer.axis = -1;
+            boxes.Sort(leftIdx, rightIdx - leftIdx + 1, comparer);
+            split_idx = (leftIdx + rightIdx + 1) / 2;
+            */
+
+            // Find the "median point" along the longest axis. I would call this the
+            // geometric middle point, but literature disagrees, so whatever.
+            float mid = centroidRangeBox.min[axis] + centroidRange[axis] / 2.0f;
+            List<BoxRef> leftBoxes = new List<BoxRef>();
+            List<BoxRef> rightBoxes = new List<BoxRef>();
+            // Classify each box in the interval into either the left or right sub-range
+            for (int i = leftIdx; i <= rightIdx; i++)
+            {
+                BoxRef boxRef = boxes[i];
+                XwVector centroid = boxRef.box.GetCentroid();
+                if (centroid[axis] <= mid)
+                    leftBoxes.Add(boxRef);
+                else
+                    rightBoxes.Add(boxRef);
+            }
+
+            // Check
+            if ((leftBoxes.Count + rightBoxes.Count) != (rightIdx - leftIdx + 1))
+                throw new Exception("left/right boxes count mismatch");
+
+            split_idx = leftIdx + leftBoxes.Count;
+
+            // Write back the left/right sub ranges into the original boxes List
+            int destIdx = leftIdx;
+            foreach (BoxRef boxRef in leftBoxes)
+                boxes[destIdx++] = boxRef;
+            foreach (BoxRef boxRef in rightBoxes)
+                boxes[destIdx++] = boxRef;
+
+            // Check
+            if (destIdx != rightIdx + 1)
+                throw new Exception("destIdx is in the wrong position after the writeback");
+
+#if DISABLED
+            Console.WriteLine("Boxes after sorting:");
+            for (int i = leftIdx; i <= rightIdx; i++)
+            {
+                Console.Write(boxes[i].TriID + ":(" + boxes[i].centroid + "), ");
+            }
+            Console.WriteLine();
+            Console.WriteLine("split_idx: " + split_idx);
+#endif
+
+            return new TreeNode(
+                -1,
+                rangeBox,
+                BuildSBVH(ref boxes, leftIdx, split_idx - 1),
+                BuildSBVH(ref boxes, split_idx, rightIdx)
+            );
+        }
+
+#if DISABLED
+        private static TreeNode BuildSBVH(ref List<BoxRef> boxes)
+        {
+            if (boxes.Count == 1)
+                return new TreeNode(boxes[0].TriID, boxes[0].box);
+
+            if (boxes.Count == 2)
+            {
+                AABB box = new AABB();
+                box.Expand(boxes[0].box);
+                box.Expand(boxes[1].box);
+                return new TreeNode(-1,
+                    box,
+                    new TreeNode(boxes[0].TriID, boxes[0].box),
+                    new TreeNode(boxes[1].TriID, boxes[1].box));
+            }
+
+            // Get the bounding box for this range
+            AABB rangeBox = new AABB();
+            for (int i = 0; i <= boxes.Count; i++)
+                rangeBox.Expand(boxes[i].box.GetCentroid());
+            XwVector range = XwVector.Substract(rangeBox.max, rangeBox.min);
 
             // Find the longest axis
             //BoxRefComparer comparer = new BoxRefComparer();
@@ -862,15 +994,6 @@ namespace XwaSmoother
                     axis = idx;
                 }
 
-#if DISABLED
-            Console.WriteLine("max: " + max + ", axis: " + comparer.axis);
-            Console.WriteLine("Boxes before sorting:");
-            for (int i = leftIdx; i <= rightIdx; i++)
-            {
-                Console.Write(boxes[i].TriID + ":(" + boxes[i].centroid + "), ");
-            }
-            Console.WriteLine();
-#endif
             // Sort along the maximum axis
             //boxes.Sort(leftIdx, rightIdx - leftIdx + 1, comparer);
             // Get the split position:
@@ -909,16 +1032,6 @@ namespace XwaSmoother
             if (destIdx != rightIdx + 1)
                 throw new Exception("destIdx is in the wrong position after the writeback");
 
-#if DISABLED
-            Console.WriteLine("Boxes after sorting:");
-            for (int i = leftIdx; i <= rightIdx; i++)
-            {
-                Console.Write(boxes[i].TriID + ":(" + boxes[i].centroid + "), ");
-            }
-            Console.WriteLine();
-            Console.WriteLine("split_idx: " + split_idx);
-#endif
-
             return new TreeNode(
                 -1,
                 rangeBox,
@@ -926,6 +1039,7 @@ namespace XwaSmoother
                 BuildSBVH(ref boxes, split_idx, rightIdx)
             );
         }
+#endif
 
         public static void ComputeBVH(string sInFileName, string sOutFileName, out string sError)
         {
@@ -934,6 +1048,8 @@ namespace XwaSmoother
             List<Vector> Vertices = new List<Vector>();
             List<Int32> Indices = new List<int>();
             List<BoxRef> Boxes = new List<BoxRef>();
+            List<AABB> MeshAABBs = new List<AABB>();
+            List<Int32> VertexCounts = new List<Int32>();
             AABB sceneBox = new AABB();
             int vertexIndexOfs = 0;
             int TriId = 0;
@@ -946,6 +1062,7 @@ namespace XwaSmoother
             for (int meshIdx = 0; meshIdx < opt.Meshes.Count; meshIdx++)
             {
                 var mesh = opt.Meshes[meshIdx];
+                AABB meshAABB = new AABB();
 
                 // Remove all the LODs, except for the first one (we'll handle LODs later)
                 for (int i = 1; i < mesh.Lods.Count; i++)
@@ -954,6 +1071,15 @@ namespace XwaSmoother
                 // Copy the vertices to their final destination
                 for (int i = 0; i < mesh.Vertices.Count; i++)
                     Vertices.Add(mesh.Vertices[i]);
+
+                // Update this mesh's AABB, and add it to the list
+                foreach (var V in Vertices)
+                    meshAABB.Expand(V);
+                MeshAABBs.Add(meshAABB);
+                // Add the vertex count as well, meshIdx and Vertices.Count will be used
+                // to identify this mesh
+                VertexCounts.Add(mesh.Vertices.Count);
+                //Console.WriteLine("meshIdx: " + meshIdx + ", Vertices.Count: " + VertexCounts.Last());
 
                 //foreach (var Lod in mesh.Lods)
                 // Let's do a BVH for the first LOD for now...
@@ -1017,16 +1143,6 @@ namespace XwaSmoother
             // Pre-pass 2:
             // * Compute the Morton codes.
             foreach (BoxRef boxref in Boxes) {
-                // Get the centroid
-                /*
-                Vector C = new Vector(0, 0, 0);
-                Add(ref C, Vertices[i]);
-                Add(ref C, Vertices[j]);
-                Add(ref C, Vertices[k]);
-                Mul(1.0f / 3.0f, ref C);
-                boxref.centroid = new Vector(C.X, C.Y, C.Z);
-                */
-
                 XwVector centroid = boxref.box.GetCentroid();
                 Vector C = new Vector(centroid.x, centroid.y, centroid.z);
                 boxref.centroid = C;
@@ -1037,38 +1153,13 @@ namespace XwaSmoother
             }
 
             // Checkpoint: save an OBJ file and check that everything looks fine
-            SaveOBJ("c:\\Temp\\LBVHInput.obj", Vertices, Indices);
+            //SaveOBJ("c:\\Temp\\LBVHInput.obj", Vertices, Indices);
 
             // Sort the primitives by their Morton codes
             Boxes.Sort();
 
-            // Checkpoint: check the sort
-            /*
-            for (int i = 0; i < Boxes.Count - 1; i++)
-            {
-                if (Boxes[i].code > Boxes[i + 1].code)
-                {
-                    Console.WriteLine("WRONG ORDERING on elements " + i + ", " + (i + 1));
-                    Console.WriteLine("code i: " + Boxes[i].code);
-                    Console.WriteLine("code i+1: " + Boxes[i+1].code);
-                    sError = "Wrong ordering";
-                    return;
-                }
-            }
-            */
-
             int numPrims = Boxes.Count;
             Console.WriteLine("numPrims: " + numPrims);
-            /*
-            int fbh = firstbithigh((uint)numPrims);
-            int capacity = (int)(0x1 << fbh);
-            Console.WriteLine("fbh: " + fbh + ", capacity: " + capacity);
-            if (capacity < numPrims)
-            {
-                fbh++; capacity *= 2;
-            }
-            Console.WriteLine("final fbh: " + fbh + ", final capacity: " + capacity);
-            */
 
             // Build the tree proper
             //TreeNode T = BuildLBVH(Boxes, 0, numPrims - 1);
@@ -1084,10 +1175,11 @@ namespace XwaSmoother
 #endif
             // DEBUG, let's dump the BVH tree structure
             SaveBVHToOBJ("c:\\temp\\LBVH.obj", T, Vertices, Indices);
-            SaveOBJ("c:\\Temp\\LBVHInput-after-sort.obj", Vertices, Indices);
+            //SaveOBJ("c:\\Temp\\LBVHInput-after-sort.obj", Vertices, Indices);
 
             // Save the tree and the primitives
-            SaveBVH(sOutFileName, NumNodes, T, Vertices, Indices, out sError);
+            SaveBVH(sOutFileName, NumNodes, T, Vertices, Indices,
+                MeshAABBs, VertexCounts, out sError);
             Console.WriteLine("Saved: " + sOutFileName);
 
             // Tidy up
@@ -1095,7 +1187,10 @@ namespace XwaSmoother
             T = null;
         }
 
-        private static void SaveBVH(string sOutFileName, int NumNodes, TreeNode T, List<Vector> Vertices, List<int> Indices, out string sError)
+        private static void SaveBVH(string sOutFileName, int NumNodes, TreeNode T,
+            List<Vector> Vertices, List<int> Indices,
+            List<AABB> MeshAABBs, List<Int32> VertexCounts,
+            out string sError)
         {
             System.IO.BinaryWriter file = new BinaryWriter(File.OpenWrite(sOutFileName));
             sError = "";
@@ -1160,6 +1255,27 @@ namespace XwaSmoother
             // Save the LBVH
             {
                 SaveLBVH(file, NumNodes, T);
+            }
+
+            // Save the mesh AABBs
+            {
+                UInt32 NumMeshes = (UInt32)MeshAABBs.Count;
+                file.Write(NumMeshes);
+
+                for (int i = 0; i < MeshAABBs.Count; i++)
+                {
+                    file.Write(BVHEncoder.EncodeAABB(MeshAABBs[i]));
+                }
+            }
+
+            // Save the vertex counts
+            {
+                UInt32 NumVertexCounts = (UInt32)VertexCounts.Count;
+                file.Write(NumVertexCounts);
+                for (int i = 0; i < VertexCounts.Count; i++)
+                {
+                    file.Write(VertexCounts[i]);
+                }
             }
 
             file.Close();
