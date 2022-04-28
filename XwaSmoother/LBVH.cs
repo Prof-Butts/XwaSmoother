@@ -156,7 +156,6 @@ namespace XwaSmoother
 
         public static unsafe int EncodeXwVector3(byte* dst, int ofs, XwVector V)
         {
-            float w = 1.0f;
             ofs = EncodeFloat(dst, ofs, V.x);
             ofs = EncodeFloat(dst, ofs, V.y);
             ofs = EncodeFloat(dst, ofs, V.z);
@@ -846,7 +845,7 @@ namespace XwaSmoother
         /// <param name="rightIdx">Right index of the range to process</param>
         /// <returns>A binary tree that represents the LBVH. All internal nodes will be missing AABBs,
         /// so this tree must be refit later.</returns>
-        private static TreeNode BuildSBVH(ref List<BoxRef> boxes, in int leftIdx, in int rightIdx)
+        private static TreeNode BuildSBVHFast(ref List<BoxRef> boxes, in int leftIdx, in int rightIdx)
         {
             int split_idx = -1;
             if (leftIdx == rightIdx)
@@ -953,11 +952,64 @@ namespace XwaSmoother
             return new TreeNode(
                 -1,
                 rangeBox,
-                BuildSBVH(ref boxes, leftIdx, split_idx - 1),
-                BuildSBVH(ref boxes, split_idx, rightIdx)
+                BuildSBVHFast(ref boxes, leftIdx, split_idx - 1),
+                BuildSBVHFast(ref boxes, split_idx, rightIdx)
             );
         }
 
+        private static TreeNode BuildSBVHStable(ref List<BoxRef> boxes, in int leftIdx, in int rightIdx)
+        {
+            int split_idx = -1;
+            if (leftIdx == rightIdx)
+                return new TreeNode(boxes[leftIdx].TriID, boxes[leftIdx].box);
+
+            if (leftIdx + 1 == rightIdx)
+            {
+                AABB box = new AABB();
+                box.Expand(boxes[leftIdx].box);
+                box.Expand(boxes[rightIdx].box);
+                return new TreeNode(-1,
+                    box,
+                    new TreeNode(boxes[leftIdx].TriID, boxes[leftIdx].box),
+                    new TreeNode(boxes[rightIdx].TriID, boxes[rightIdx].box));
+            }
+
+            // Get the bounding box for this range
+            AABB centroidRangeBox = new AABB();
+            AABB rangeBox = new AABB();
+            for (int idx = leftIdx; idx <= rightIdx; idx++)
+            {
+                centroidRangeBox.Expand(boxes[idx].box.GetCentroid());
+                rangeBox.Expand(boxes[idx].box);
+            }
+            XwVector centroidRange = XwVector.Substract(centroidRangeBox.max, centroidRangeBox.min);
+            XwVector range = XwVector.Substract(rangeBox.max, rangeBox.min);
+
+            // Find the longest axis
+            int axis = -1;
+            float max = -1.0f;
+            for (int idx = 0; idx < 3; idx++)
+                if (centroidRange[idx] > max)
+                {
+                    //max = centroidRange[idx];
+                    max = range[idx];
+                    axis = idx;
+                }
+
+            // Sort along the maximum axis
+            BoxRefComparer comparer = new BoxRefComparer();
+            comparer.axis = axis;
+            boxes.Sort(leftIdx, rightIdx - leftIdx + 1, comparer);
+            split_idx = (leftIdx + rightIdx + 1) / 2;
+
+            return new TreeNode(
+                -1,
+                rangeBox,
+                BuildSBVHStable(ref boxes, leftIdx, split_idx - 1),
+                BuildSBVHStable(ref boxes, split_idx, rightIdx)
+            );
+        }
+   
 #if DISABLED
         private static TreeNode BuildSBVH(ref List<BoxRef> boxes)
         {
@@ -1168,7 +1220,7 @@ namespace XwaSmoother
             //int NumNodes = 0;
             //Refit(T, Boxes, out NumNodes);
 
-            TreeNode T = BuildSBVH(ref Boxes, 0, numPrims - 1);
+            TreeNode T = BuildSBVHStable(ref Boxes, 0, numPrims - 1);
             int NumNodes = CountNodes(T);
 #if DEBUG
             //PrintTree("", T);
