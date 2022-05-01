@@ -155,7 +155,7 @@
             this.BVHButton.Name = "BVHButton";
             this.BVHButton.Size = new System.Drawing.Size(98, 23);
             this.BVHButton.TabIndex = 8;
-            this.BVHButton.Text = "&BVH";
+            this.BVHButton.Text = "Save &BVH";
             this.BVHButton.UseVisualStyleBackColor = true;
             this.BVHButton.Click += new System.EventHandler(this.BVHButton_Click);
             // 

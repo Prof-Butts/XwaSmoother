@@ -20,7 +20,20 @@ namespace XwaSmoother
 
         public AABB()
         {
+            this.min = new XwVector();
+            this.max = new XwVector();
             MakeInvalid();
+        }
+
+        public AABB(AABB box)
+        {
+            this.min = new XwVector();
+            this.max = new XwVector();
+            for (int i = 0; i < 3; i++)
+            {
+                this.min[i] = box.min[i];
+                this.max[i] = box.max[i];
+            }
         }
 
         public void MakeInvalid()
@@ -49,12 +62,15 @@ namespace XwaSmoother
             if (V.Z > max.z) max.z = V.Z;
         }
 
-        public void Expand(AABB aabb)
+        public void Expand(AABB box)
         {
+            if (box == null)
+                return;
+
             for (int i = 0; i < 3; i++)
             {
-                if (aabb.min[i] < min[i]) min[i] = aabb.min[i];
-                if (aabb.max[i] > max[i]) max[i] = aabb.max[i];
+                if (box.min[i] < this.min[i]) this.min[i] = box.min[i];
+                if (box.max[i] > this.max[i]) this.max[i] = box.max[i];
             }
         }
 
@@ -176,13 +192,13 @@ namespace XwaSmoother
             return data;
         }
 
-        public static unsafe byte[] EncodeTreeNode(TreeNode T, Int32 parent, Int32 left, Int32 right)
+        public static unsafe byte[] EncodeTreeNode2(TreeNode T, Int32 parent, Int32 left, Int32 right)
         {
-            byte[] data = new byte[LBVH.ENCODED_TREE_NODE_SIZE];
+            byte[] data = new byte[LBVH.ENCODED_TREE_NODE_SIZE_BVH2];
             int ofs = 0;
             fixed (byte *dst = &data[0])
             {
-                ofs = EncodeInt32(dst, ofs, T.boxRefIdx);
+                ofs = EncodeInt32(dst, ofs, T.TriID);
                 ofs = EncodeInt32(dst, ofs, left);
                 ofs = EncodeInt32(dst, ofs, right);
                 ofs = EncodeInt32(dst, ofs, parent);
@@ -193,9 +209,37 @@ namespace XwaSmoother
                 // 16 bytes
             }
 
-            if (ofs != LBVH.ENCODED_TREE_NODE_SIZE)
+            if (ofs != LBVH.ENCODED_TREE_NODE_SIZE_BVH2)
             {
-                throw new Exception("TreeNode should be encoded in " + LBVH.ENCODED_TREE_NODE_SIZE +
+                throw new Exception("TreeNode should be encoded in " + LBVH.ENCODED_TREE_NODE_SIZE_BVH2 +
+                    " bytes, got " + ofs + " instead");
+            }
+            return data;
+        }
+
+        public static unsafe byte[] EncodeTreeNode4(IGenericTree T, Int32 parent, List<Int32> children)
+        {
+            byte[] data = new byte[LBVH.ENCODED_TREE_NODE_SIZE_BVH4];
+            AABB box = T.GetBox();
+            int ofs = 0;
+            fixed (byte* dst = &data[0])
+            {
+                // 4 bytes
+                ofs = EncodeInt32(dst, ofs, T.GetTriID());
+                // 12 bytes
+                ofs = EncodeXwVector3(dst, ofs, box.min);
+                // 12 bytes
+                ofs = EncodeXwVector3(dst, ofs, box.max);
+                // 4 bytes
+                ofs = EncodeInt32(dst, ofs, parent);
+                // 4 bytes for each children = 16 bytes
+                for (int i = 0; i < 4; i++)
+                    ofs = EncodeInt32(dst, ofs, children[i]);
+            }
+
+            if (ofs != LBVH.ENCODED_TREE_NODE_SIZE_BVH4)
+            {
+                throw new Exception("TreeNode should be encoded in " + LBVH.ENCODED_TREE_NODE_SIZE_BVH4 +
                     " bytes, got " + ofs + " instead");
             }
             return data;
@@ -204,45 +248,48 @@ namespace XwaSmoother
 
     public interface IGenericTree
     {
+        int GetArity();
         bool IsLeaf();
+        AABB GetBox();
+        int GetTriID();
         List<IGenericTree> GetChildren();
         IGenericTree GetParent();
     }
 
     public class TreeNode : IGenericTree
     {
-        public int boxRefIdx;
+        public int TriID;
         public TreeNode left, right, parent;
         public AABB box;
         public MortonCode_t code;
 
         public TreeNode()
         {
-            boxRefIdx = -1;
+            TriID = -1;
             left = right = parent = null;
             box = new AABB();
             code = 0;
         }
 
-        public TreeNode(int boxRefIdx)
+        public TreeNode(int TriID)
         {
-            this.boxRefIdx = boxRefIdx;
+            this.TriID = TriID;
             left = right = parent = null;
             box = new AABB();
             code = 0;
         }
 
-        public TreeNode(int boxRefIdx, MortonCode_t code)
+        public TreeNode(int TriID, MortonCode_t code)
         {
-            this.boxRefIdx = boxRefIdx;
+            this.TriID = TriID;
             this.code = code;
             left = right = parent = null;
             box = new AABB();
         }
 
-        public TreeNode(int boxRefIdx, TreeNode left, TreeNode right)
+        public TreeNode(int TriID, TreeNode left, TreeNode right)
         {
-            this.boxRefIdx = boxRefIdx;
+            this.TriID = TriID;
             this.left = left;
             this.right = right;
             this.parent = null;
@@ -250,9 +297,9 @@ namespace XwaSmoother
             this.code = 0;
         }
 
-        public TreeNode(int boxRefIdx, AABB box, TreeNode left, TreeNode right)
+        public TreeNode(int TriID, AABB box, TreeNode left, TreeNode right)
         {
-            this.boxRefIdx = boxRefIdx;
+            this.TriID = TriID;
             this.left = left;
             this.right = right;
             this.parent = null;
@@ -260,9 +307,9 @@ namespace XwaSmoother
             this.code = 0;
         }
 
-        public TreeNode(int boxRefIdx, TreeNode left, TreeNode right, TreeNode parent)
+        public TreeNode(int TriID, TreeNode left, TreeNode right, TreeNode parent)
         {
-            this.boxRefIdx = boxRefIdx;
+            this.TriID = TriID;
             this.left = left;
             this.right = right;
             this.parent = parent;
@@ -270,15 +317,30 @@ namespace XwaSmoother
             this.code = 0;
         }
 
-        public TreeNode(int boxRefIdx, AABB box)
+        public TreeNode(int TriID, AABB box)
         {
-            this.boxRefIdx = boxRefIdx;
+            this.TriID = TriID;
             this.left = null;
             this.right = null;
             this.parent = null;
             this.code = 0;
             this.box = new AABB();
             this.box.Expand(box);
+        }
+
+        public int GetArity()
+        {
+            return 2;
+        }
+
+        public AABB GetBox()
+        {
+            return this.box;
+        }
+
+        public int GetTriID()
+        {
+            return this.TriID;
         }
 
         public bool IsLeaf()
@@ -299,6 +361,92 @@ namespace XwaSmoother
         public IGenericTree GetParent()
         {
             return this.parent;
+        }
+    }
+
+    public class QTreeNode : IGenericTree
+    {
+        public int TriID;
+        public QTreeNode parent;
+        public QTreeNode[] children;
+        public AABB box;
+        public MortonCode_t code;
+
+        public QTreeNode(int TriID)
+        {
+            this.TriID = TriID;
+            this.box = null;
+            this.code = 0;
+            this.children = new QTreeNode[4];
+            for (int i = 0; i < 4; i++)
+                this.children[i] = null;
+        }
+
+        public QTreeNode(int TriID, QTreeNode[] children)
+        {
+            this.TriID = TriID;
+            this.box = null;
+            this.code = 0;
+            this.children = new QTreeNode[4];
+            for (int i = 0; i < 4; i++)
+                this.children[i] = children[i];
+        }
+
+        public QTreeNode(int TriID, AABB box)
+        {
+            this.TriID = TriID;
+            this.children = new QTreeNode[4];
+            this.box = box;
+            this.code = 0;
+            for (int i = 0; i < 4; i++)
+                this.children[i] = null;
+        }
+
+        public QTreeNode(int TriID, AABB box, QTreeNode[] children, QTreeNode parent)
+        {
+            this.TriID = TriID;
+            this.box = box;
+            this.parent = parent;
+            this.children = new QTreeNode[4];
+            for (int i = 0; i < 4; i++)
+                this.children[i] = children[i];
+        }
+
+        public int GetArity()
+        {
+            return 4;
+        }
+
+        public AABB GetBox()
+        {
+            return this.box;
+        }
+
+        public int GetTriID()
+        {
+            return this.TriID;
+        }
+
+        public bool IsLeaf()
+        {
+            for (int i = 0; i < 4; i++)
+                if (children[i] != null)
+                    return false;
+            return true;
+        }
+
+        public List<IGenericTree> GetChildren()
+        {
+            List<IGenericTree> result = new List<IGenericTree>();
+            for (int i = 0; i < 4; i++)
+                if (children[i] != null)
+                    result.Add(children[i]);
+            return result;
+        }
+
+        public IGenericTree GetParent()
+        {
+            return parent;
         }
     }
 
@@ -331,7 +479,8 @@ namespace XwaSmoother
     public class LBVH
     {
         public const float OPT_TO_METERS = 1.0f / 40.96f;
-        public const int ENCODED_TREE_NODE_SIZE = 48;
+        public const int ENCODED_TREE_NODE_SIZE_BVH2 = 48;
+        public const int ENCODED_TREE_NODE_SIZE_BVH4 = 48;
 
         private static void Add(ref Vector A, Vector B)
         {
@@ -490,21 +639,12 @@ namespace XwaSmoother
         }
 #endif
 
-        private static void DeleteTree(TreeNode T)
-        {
-            if (T == null)
-                return;
-
-            DeleteTree(T.left);
-            DeleteTree(T.right);
-        }
-
         private static void PrintTree(string level, TreeNode T)
         {
             if (T == null)
                 return;
             PrintTree(level + "    ", T.right);
-            Console.WriteLine(level + T.boxRefIdx);
+            Console.WriteLine(level + T.TriID);
             /*
             if (T.boxRefIdx == -1)
                 Console.WriteLine(level + T.boxRefIdx);
@@ -512,6 +652,78 @@ namespace XwaSmoother
                 Console.WriteLine(level + T.boxRefIdx + "-" + to_binary(T.code, 3));
             */
             PrintTree(level + "    ", T.left);
+        }
+
+        private static void PrintTree(string level, IGenericTree T)
+        {
+            if (T == null)
+                return;
+
+            int arity = T.GetArity();
+            List<IGenericTree> children = T.GetChildren();
+
+            Console.WriteLine(level + "    --");
+            for (int i = arity - 1; i >= arity / 2; i--)
+                if (i < children.Count)
+                    PrintTree(level + "    ", children[i]);
+            
+            Console.WriteLine(level + T.GetTriID());
+
+            for (int i = arity / 2 - 1; i >= 0; i--)
+                if (i < children.Count)
+                    PrintTree(level + "    ", children[i]);
+            Console.WriteLine(level + "    --");
+        }
+
+        public static QTreeNode BinTreeToQTree(TreeNode T)
+        {
+            QTreeNode[] children = { null, null, null, null };
+            if (T == null)
+                return null;
+
+            if (T.IsLeaf())
+                return new QTreeNode(T.TriID, T.box);
+
+            // In a standard BVH all internal nodes have two children
+            TreeNode L = T.left;
+            TreeNode R = T.right;
+            int nextchild = 0;
+
+            if (L.IsLeaf())
+                children[nextchild++] = new QTreeNode(L.TriID, L.box);
+            else
+            {
+                if (L.left != null)
+                    if (L.left.IsLeaf())
+                        children[nextchild++] = new QTreeNode(L.left.TriID, L.left.box);
+                    else
+                        children[nextchild++] = BinTreeToQTree(L.left);
+
+                if (L.right != null)
+                    if (L.right.IsLeaf())
+                        children[nextchild++] = new QTreeNode(L.right.TriID, L.right.box);
+                    else
+                        children[nextchild++] = BinTreeToQTree(L.right);
+            }
+
+            if (R.IsLeaf())
+                children[nextchild++] = new QTreeNode(R.TriID, R.box);
+            else
+            {
+                if (R.left != null)
+                    if (R.left.IsLeaf())
+                        children[nextchild++] = new QTreeNode(R.left.TriID, R.left.box);
+                    else
+                        children[nextchild++] = BinTreeToQTree(R.left);
+
+                if (R.right != null)
+                    if (R.right.IsLeaf())
+                        children[nextchild++] = new QTreeNode(R.right.TriID, R.right.box);
+                    else
+                        children[nextchild++] = BinTreeToQTree(R.right);
+            }
+
+            return new QTreeNode(-1, children);
         }
 
         private static AABB Refit(TreeNode T, in List<BoxRef> boxes, out int NumTreeNodes)
@@ -522,10 +734,10 @@ namespace XwaSmoother
                 return null;
             }
 
-            if (T.boxRefIdx != -1)
+            if (T.IsLeaf())
             {
-                T.box.MakeInvalid();
-                T.box.Expand(boxes[T.boxRefIdx].box);
+                // Sorting the boxes breaks the correspondence between a box's index and a triangle
+                // index. In other words T.TriID != boxes[T.TriID].TriID
                 NumTreeNodes = 1;
                 return T.box;
             }
@@ -533,7 +745,7 @@ namespace XwaSmoother
             int NumNodesL, NumNodesR;
             AABB boxL = Refit(T.left, boxes, out NumNodesL);
             AABB boxR = Refit(T.right, boxes, out NumNodesR);
-            T.box.MakeInvalid();
+            T.box = new AABB();
             if (T.left != null)
             {
                 T.box.Expand(boxL);
@@ -548,12 +760,43 @@ namespace XwaSmoother
             return T.box;
         }
 
+        private static AABB Refit(QTreeNode T, in List<BoxRef> boxes, out int NumTreeNodes)
+        {
+            if (T == null)
+            {
+                NumTreeNodes = 0;
+                return null;
+            }
+
+            if (T.IsLeaf())
+            {
+                // Sorting the boxes breaks the correspondence between a box's index and a triangle
+                // index. In other words T.TriID != boxes[T.TriID].TriID
+                NumTreeNodes = 1;
+                return T.box;
+            }
+
+            T.box = new AABB();
+            int NumNodesChildren = 0;
+            for (int i = 0; i < 4; i++)
+                if (T.children[i] != null)
+                {
+                    int NumNodes = 0;
+                    T.box.Expand(Refit(T.children[i], boxes, out NumNodes));
+                    NumNodesChildren += NumNodes;
+                    T.children[i].parent = T;
+                }
+
+            NumTreeNodes = 1 + NumNodesChildren;
+            return T.box;
+        }
+
         private static int CountNodes(TreeNode T)
         {
             if (T == null)
                 return 0;
 
-            if (T.boxRefIdx != -1)
+            if (T.TriID != -1)
                 return 1;
 
             return 1 + CountNodes(T.left) + CountNodes(T.right);
@@ -679,10 +922,10 @@ namespace XwaSmoother
 
         private struct QNode
         {
-            public TreeNode T;
+            public IGenericTree T;
             public int level;
 
-            public QNode(TreeNode T, int level)
+            public QNode(IGenericTree T, int level)
             {
                 this.T = T;
                 this.level = level;
@@ -699,8 +942,8 @@ namespace XwaSmoother
         /// <param name="vertices"></param>
         /// <param name="indices"></param>
         /// <returns></returns>
-        private static int _SaveBVHToOBJ(StreamWriter file, TreeNode root, int vertOfs,
-            in List<Vector> vertices, in List<Int32> indices)
+        private static int _SaveBVHToOBJ(StreamWriter file, IGenericTree root, int vertOfs,
+            in List<Vector> vertices, in List<Int32> indices, bool onlyLeaves=false)
         {
             int prev_level = -1;
             Queue<QNode> Q = new Queue<QNode>();
@@ -708,7 +951,7 @@ namespace XwaSmoother
             while (Q.Count > 0)
             {
                 QNode qnode = Q.Dequeue();
-                TreeNode T = qnode.T;
+                IGenericTree T = qnode.T;
                 // Start a new OBJ object if we jumped to a new level
                 if (prev_level != qnode.level)
                 {
@@ -716,21 +959,32 @@ namespace XwaSmoother
                     prev_level = qnode.level;
                 }
 
-                vertOfs = SaveAABBToOBJ(file, null, T.box, vertOfs);
-                if (T.IsLeaf())
-                    vertOfs = SaveTriangleToOBJ(file, null, T.boxRefIdx, vertOfs, vertices, indices);
+                if (onlyLeaves)
+                {
+                    if (T.IsLeaf())
+                    {
+                        vertOfs = SaveAABBToOBJ(file, null, T.GetBox(), vertOfs);
+                        vertOfs = SaveTriangleToOBJ(file, null, T.GetTriID(), vertOfs, vertices, indices);
+                    }
+                }
+                else
+                {
+                    vertOfs = SaveAABBToOBJ(file, null, T.GetBox(), vertOfs);
+                    if (T.IsLeaf())
+                        vertOfs = SaveTriangleToOBJ(file, null, T.GetTriID(), vertOfs, vertices, indices);
+                }
 
-                foreach (TreeNode child in T.GetChildren())
+                foreach (IGenericTree child in T.GetChildren())
                     Q.Enqueue(new QNode(child, qnode.level + 1));
             }
             return vertOfs;
         }
 
-        public static void SaveBVHToOBJ(string sOutFileName, TreeNode T,
-            in List<Vector> vertices, in List<Int32> indices)
+        public static void SaveBVHToOBJ(string sOutFileName, IGenericTree T,
+            in List<Vector> vertices, in List<Int32> indices, bool onlyLeaves=false)
         {
             StreamWriter file = new StreamWriter(sOutFileName);
-            _SaveBVHToOBJ(file, T, 0, vertices, indices);
+            _SaveBVHToOBJ(file, T, 0, vertices, indices, onlyLeaves);
             file.Close();
         }
 
@@ -840,13 +1094,11 @@ namespace XwaSmoother
 
         /// <summary>
         /// Naive implementation of the SBVH minus triangle splitting.
-        /// In other words, sort along the longest axis at each level.
         /// </summary>
         /// <param name="boxes">Unsorted AABBs</param>
         /// <param name="leftIdx">Left index of the range to process</param>
         /// <param name="rightIdx">Right index of the range to process</param>
-        /// <returns>A binary tree that represents the LBVH. All internal nodes will be missing AABBs,
-        /// so this tree must be refit later.</returns>
+        /// <returns>A binary tree that represents the BVH, no refitting needed.</returns>
         private static TreeNode BuildSBVHFast(ref List<BoxRef> boxes, in int leftIdx, in int rightIdx)
         {
             int split_idx = -1;
@@ -1014,89 +1266,6 @@ namespace XwaSmoother
             );
         }
    
-#if DISABLED
-        private static TreeNode BuildSBVH(ref List<BoxRef> boxes)
-        {
-            if (boxes.Count == 1)
-                return new TreeNode(boxes[0].TriID, boxes[0].box);
-
-            if (boxes.Count == 2)
-            {
-                AABB box = new AABB();
-                box.Expand(boxes[0].box);
-                box.Expand(boxes[1].box);
-                return new TreeNode(-1,
-                    box,
-                    new TreeNode(boxes[0].TriID, boxes[0].box),
-                    new TreeNode(boxes[1].TriID, boxes[1].box));
-            }
-
-            // Get the bounding box for this range
-            AABB rangeBox = new AABB();
-            for (int i = 0; i <= boxes.Count; i++)
-                rangeBox.Expand(boxes[i].box.GetCentroid());
-            XwVector range = XwVector.Substract(rangeBox.max, rangeBox.min);
-
-            // Find the longest axis
-            //BoxRefComparer comparer = new BoxRefComparer();
-            //comparer.axis = -1;
-            int axis = -1;
-            float max = -1.0f;
-            for (int idx = 0; idx < 3; idx++)
-                if (range[idx] > max)
-                {
-                    max = range[idx];
-                    //comparer.axis = idx;
-                    axis = idx;
-                }
-
-            // Sort along the maximum axis
-            //boxes.Sort(leftIdx, rightIdx - leftIdx + 1, comparer);
-            // Get the split position:
-            //split_idx = (leftIdx + rightIdx) / 2;
-
-            // Find the "median point" along the longest axis. I would call this the
-            // geometric middle point, but literature disagrees, so whatever.
-            float mid = rangeBox.min[axis] + range[axis] / 2.0f;
-            List<BoxRef> leftBoxes = new List<BoxRef>();
-            List<BoxRef> rightBoxes = new List<BoxRef>();
-            // Classify each box in the interval into either the left or right sub-range
-            for (int i = leftIdx; i <= rightIdx; i++)
-            {
-                BoxRef boxRef = boxes[i];
-                XwVector centroid = boxRef.box.GetCentroid();
-                if (centroid[axis] <= mid)
-                    leftBoxes.Add(boxRef);
-                else
-                    rightBoxes.Add(boxRef);
-            }
-
-            // Check
-            if ((leftBoxes.Count + rightBoxes.Count) != (rightIdx - leftIdx + 1))
-                throw new Exception("left/right boxes count mismatch");
-
-            int split_idx = leftIdx + leftBoxes.Count;
-
-            // Write back the left/right sub ranges into the original boxes List
-            int destIdx = leftIdx;
-            foreach (BoxRef boxRef in leftBoxes)
-                boxes[destIdx++] = boxRef;
-            foreach (BoxRef boxRef in rightBoxes)
-                boxes[destIdx++] = boxRef;
-
-            // Check
-            if (destIdx != rightIdx + 1)
-                throw new Exception("destIdx is in the wrong position after the writeback");
-
-            return new TreeNode(
-                -1,
-                rangeBox,
-                BuildSBVH(ref boxes, leftIdx, split_idx - 1),
-                BuildSBVH(ref boxes, split_idx, rightIdx)
-            );
-        }
-#endif
-
         public static void ComputeBVH(string sInFileName, string sOutFileName, out string sError)
         {
             var opt = OptFile.FromFile(sInFileName);
@@ -1228,35 +1397,52 @@ namespace XwaSmoother
 
             //TreeNode T = BuildSBVHStable(ref Boxes, 0, numPrims - 1);
             TreeNode T = BuildSBVHFast(ref Boxes, 0, numPrims - 1);
-            int NumNodes = CountNodes(T);
+
 #if DEBUG
-            //PrintTree("", T);
-            // DEBUG, let's dump the BVH tree structure
-            SaveBVHToOBJ("c:\\temp\\LBVH.obj", T, Vertices, Indices);
             //SaveOBJ("c:\\Temp\\LBVHInput-after-sort.obj", Vertices, Indices);
+            //PrintTree("", T);
+            
+            // DEBUG, let's dump the BVH tree structure
+            //SaveBVHToOBJ("c:\\temp\\BVH2.obj", T, Vertices, Indices);
+
+            // Check that the refit didn't mess up the boxes
+            //int temp;
+            //Refit(T, Boxes, out temp);
+            //SaveBVHToOBJ("c:\\temp\\BVH2Refit.obj", T, Vertices, Indices, true);
 #endif
 
+#if BVH2
+            int NumNodes = CountNodes(T);
             // Save the tree and the primitives
-            SaveBVH(sOutFileName, NumNodes, T, Vertices, Indices,
-                MeshAABBs, VertexCounts, out sError);
-            Console.WriteLine("Saved: " + sOutFileName);
+            SaveBVH(sOutFileName, NumNodes, T, Vertices, Indices, out sError);
+            Console.WriteLine("Saved BVH2: " + sOutFileName);
+#else
+            // BVH4
+            QTreeNode Q = BinTreeToQTree(T);
+            int NumNodes = 0;
+            Refit(Q, Boxes, out NumNodes);
+#if DEBUG
+            SaveBVHToOBJ("c:\\temp\\BVH4.obj", Q, Vertices, Indices);
+            //PrintTree("", Q);
+#endif
+            SaveBVH(sOutFileName, NumNodes, Q, Vertices, Indices, out sError);
+            Console.WriteLine("Saved BVH4: " + sOutFileName);
+            Q = null;
+#endif
 
             // Tidy up
-            DeleteTree(T);
             T = null;
         }
 
-        private static void SaveBVH(string sOutFileName, int NumNodes, TreeNode T,
-            List<Vector> Vertices, List<int> Indices,
-            List<AABB> MeshAABBs, List<Int32> VertexCounts,
-            out string sError)
+        private static void SaveBVH(string sOutFileName, int NumNodes, IGenericTree T,
+            List<Vector> Vertices, List<int> Indices, out string sError)
         {
             System.IO.BinaryWriter file = new BinaryWriter(File.OpenWrite(sOutFileName));
             sError = "";
 
             // Save the Magic Word/Version
             {
-                string Magic = "BVH2-1.0";
+                string Magic = "BVH" + T.GetArity() + "-1.0";
                 byte[] data = Encoding.ASCII.GetBytes(Magic);
                 file.Write(data);
             }
@@ -1298,9 +1484,9 @@ namespace XwaSmoother
                     file.Write(data[i]);
             }
 
-            // Save the LBVH
+            // Save the BVH
             {
-                SaveLBVH(file, NumNodes, T);
+                SaveBVH(file, NumNodes, T);
             }
 
             // We don't need to save the AABBs nor Vertex Counts anymore
@@ -1330,11 +1516,12 @@ namespace XwaSmoother
             file.Close();
         }
 
-        private static void SaveLBVH(BinaryWriter file, int NumNodes, IGenericTree root)
+        private static void SaveBVH(BinaryWriter file, int NumNodes, IGenericTree root)
         {
             if (root == null)
                 return;
 
+            int arity = root.GetArity();
             // Write the number of nodes in the tree
             file.Write(NumNodes);
 
@@ -1344,7 +1531,7 @@ namespace XwaSmoother
             Queue<IGenericTree> Q = new Queue<IGenericTree>();
 
             // Initialize the queue and the offsets. Note that the offsets are relative to the
-            // on-disk beginning of the LBVH -- not absolute offsets from the beginning of the file.
+            // on-disk beginning of the BVH -- not absolute offsets from the beginning of the file.
             Q.Enqueue(root);
             // Since we're going to put this data in an array, it's easier to specify the children
             // offsets as indices into this array.
@@ -1356,17 +1543,34 @@ namespace XwaSmoother
                 List<IGenericTree> children = T.GetChildren();
 
                 // In a breadth-first search, the left child will always be at offset nextNode
-                file.Write(
-                    BVHEncoder.EncodeTreeNode((TreeNode)T, 0 /* parent (TODO) */,
-                        children.Count > 0 ? nextNode : -1,
-                        children.Count > 1 ? nextNode + 1 : -1)
-                );
-
-                // Enqueue the children
-                foreach (var child in children)
+                switch (arity)
                 {
-                    Q.Enqueue(child);
-                    nextNode++;
+                    case 2:
+                        file.Write(
+                            BVHEncoder.EncodeTreeNode2((TreeNode)T, -1 /* parent (TODO) */,
+                                children.Count > 0 ? nextNode : -1,
+                                children.Count > 1 ? nextNode + 1 : -1)
+                        );
+                        break;
+                    case 4:
+                        // Encode BVH4 nodes
+                        // EncodeTreeNode4 needs to be made to work for arity N in order to make this
+                        // case generic.
+                        List<Int32> childOfs = new List<Int32>();
+                        for (int i = 0; i < arity; i++)
+                            childOfs.Add(i < children.Count ? nextNode + i : -1);
+
+                        file.Write(
+                            BVHEncoder.EncodeTreeNode4(T, -1 /* parent (TODO) */, childOfs)
+                        );
+
+                        // Enqueue the children
+                        foreach (var child in children)
+                        {
+                            Q.Enqueue(child);
+                            nextNode++;
+                        }
+                        break;
                 }
             }
         }

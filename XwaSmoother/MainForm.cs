@@ -134,9 +134,11 @@ namespace XwaSmoother
             LBVH.ComputeBVH(sInFileName, sOutFileName, out sError);
             if (sError.Length > 0)
             {
-                MessageBox.Show(sError, "Error", MessageBoxButtons.OK);
+                MessageBox.Show(sError, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
+
+            MessageBox.Show("Saved " + sOutFileName, "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
     }
 }

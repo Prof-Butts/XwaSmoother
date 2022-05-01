@@ -71,56 +71,6 @@ namespace XwaOpter
 #endif
 
         [STAThread]
-        static void MainOld(string[] args)
-        {
-            Console.WriteLine("OPT Normals Smoother 1.0");
-
-            //string sInFileName = GetOpenFile();
-            //string sOutFileName = GetSaveAsFile(sInFileName);
-            string sInFileName = "";
-            string sOutFileName = "";
-
-            List<int> targetMeshIndices = new List<int>();
-            string targetMeshIndexString = Microsoft.VisualBasic.Interaction.InputBox(
-                "Mesh index:\n-1 means whole OPT\nUse commas to specify multiple meshes (i.e. 0,1,2)",
-                "Mesh index",
-                "-1");
-            if (!string.IsNullOrEmpty(targetMeshIndexString))
-            {
-                string[] indicesString = targetMeshIndexString.Split(',');
-                foreach (var indexString in indicesString)
-                {
-                    int targetIdx = int.Parse(indexString, CultureInfo.InvariantCulture);
-                    if (targetIdx == -1)
-                    {
-                        targetMeshIndices.Clear();
-                        break;
-                    }
-                    else
-                        targetMeshIndices.Add(targetIdx);
-                }
-            }
-
-            float threshold = SmootherEngine.DEFAULT_ANGLE_THRESHOLD;
-            string thresholdString = Microsoft.VisualBasic.Interaction.InputBox(
-                "Normals threshold in degrees:",
-                "Normals threshold",
-                threshold.ToString(CultureInfo.InvariantCulture));
-            if (!string.IsNullOrEmpty(thresholdString))
-            {
-                threshold = float.Parse(thresholdString, CultureInfo.InvariantCulture);
-            }
-
-            List<string> sThresholds = new List<string>();
-            SmootherEngine.Smooth(sInFileName, sOutFileName, sThresholds);
-
-#if DEBUG
-            Console.WriteLine("Press any key to continue...");
-            Console.ReadKey();
-#endif
-        }
-
-        [STAThread]
         static void TestThresholdParser(string[] args)
         {
             List<string> sThresholds = new List<string>();
@@ -140,6 +90,30 @@ namespace XwaOpter
         [STAThread]
         static void Main(string[] args)
         {
+            AABB box1 = new AABB(), box2 = new AABB();
+            box1.min[0] = -1;
+            box1.min[1] = -2;
+            box1.min[2] = -3;
+
+            box1.max[0] = 1;
+            box1.max[1] = 2;
+            box1.max[2] = 3;
+
+            box2.min[0] = -2;
+            box2.min[1] = -4;
+            box2.min[2] = -6;
+
+            box2.max[0] = 3;
+            box2.max[1] = 6;
+            box2.max[2] = 8;
+
+            AABB box = new AABB();
+            box.Expand(box2);
+            box.Expand(box1);
+            Console.WriteLine("box1: " + box1);
+            Console.WriteLine("box2: " + box2);
+            Console.WriteLine("box: " + box);
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new MainForm());
