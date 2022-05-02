@@ -726,7 +726,7 @@ namespace XwaSmoother
             return new QTreeNode(-1, children);
         }
 
-        private static AABB Refit(TreeNode T, in List<BoxRef> boxes, out int NumTreeNodes)
+        private static AABB Refit(TreeNode T, out int NumTreeNodes)
         {
             if (T == null)
             {
@@ -743,8 +743,8 @@ namespace XwaSmoother
             }
 
             int NumNodesL, NumNodesR;
-            AABB boxL = Refit(T.left, boxes, out NumNodesL);
-            AABB boxR = Refit(T.right, boxes, out NumNodesR);
+            AABB boxL = Refit(T.left, out NumNodesL);
+            AABB boxR = Refit(T.right, out NumNodesR);
             T.box = new AABB();
             if (T.left != null)
             {
@@ -760,7 +760,7 @@ namespace XwaSmoother
             return T.box;
         }
 
-        private static AABB Refit(QTreeNode T, in List<BoxRef> boxes, out int NumTreeNodes)
+        private static AABB Refit(QTreeNode T, out int NumTreeNodes)
         {
             if (T == null)
             {
@@ -782,7 +782,7 @@ namespace XwaSmoother
                 if (T.children[i] != null)
                 {
                     int NumNodes = 0;
-                    T.box.Expand(Refit(T.children[i], boxes, out NumNodes));
+                    T.box.Expand(Refit(T.children[i], out NumNodes));
                     NumNodesChildren += NumNodes;
                     T.children[i].parent = T;
                 }
@@ -1391,9 +1391,8 @@ namespace XwaSmoother
             // Build the tree proper
             //TreeNode T = BuildLBVH(Boxes, 0, numPrims - 1);
             // Compute the inner nodes' AABBs
-            // TODO: The refit is buggy: it's messing up the inner nodes AABBs for some reason
             //int NumNodes = 0;
-            //Refit(T, Boxes, out NumNodes);
+            //Refit(T, out NumNodes);
 
             //TreeNode T = BuildSBVHStable(ref Boxes, 0, numPrims - 1);
             TreeNode T = BuildSBVHFast(ref Boxes, 0, numPrims - 1);
@@ -1407,7 +1406,7 @@ namespace XwaSmoother
 
             // Check that the refit didn't mess up the boxes
             //int temp;
-            //Refit(T, Boxes, out temp);
+            //Refit(T, out temp);
             //SaveBVHToOBJ("c:\\temp\\BVH2Refit.obj", T, Vertices, Indices, true);
 #endif
 
@@ -1420,7 +1419,7 @@ namespace XwaSmoother
             // BVH4
             QTreeNode Q = BinTreeToQTree(T);
             int NumNodes = 0;
-            Refit(Q, Boxes, out NumNodes);
+            Refit(Q, out NumNodes);
 #if DEBUG
             SaveBVHToOBJ("c:\\temp\\BVH4.obj", Q, Vertices, Indices);
             //PrintTree("", Q);
