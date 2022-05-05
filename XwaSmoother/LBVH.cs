@@ -496,6 +496,15 @@ namespace XwaSmoother
             A.Z -= B.Z;
         }
 
+        private static Vector Sub(Vector A, Vector B)
+        {
+            Vector C = new Vector();
+            C.X = A.X - B.X;
+            C.Y = A.Y - B.Y;
+            C.Z = A.Z - B.Z;
+            return C;
+        }
+
         private static void Sub(ref Vector A, XwVector B)
         {
             A.X -= B.x;
@@ -515,6 +524,24 @@ namespace XwaSmoother
             Numerator.X /= Denominator.X;
             Numerator.Y /= Denominator.Y;
             Numerator.Z /= Denominator.Z;
+        }
+
+        private static void Div(ref Vector Numerator, float Denominator)
+        {
+            Numerator.X /= Denominator;
+            Numerator.Y /= Denominator;
+            Numerator.Z /= Denominator;
+        }
+
+        private static float Length(Vector V)
+        {
+            return (float)Math.Sqrt(V.X * V.X + V.Y * V.Y + V.Z * V.Z);
+        }
+
+        private static void Normalize(ref Vector V)
+        {
+            float L = Length(V);
+            Div(ref V, L);
         }
 
         /// <summary>
@@ -800,6 +827,104 @@ namespace XwaSmoother
                 return 1;
 
             return 1 + CountNodes(T.left) + CountNodes(T.right);
+        }
+
+        public static float Get(Vector V, int key)
+        {
+            switch (key)
+            {
+                case 0: return V.X;
+                case 1: return V.Y;
+                case 2: return V.Z;
+            }
+            return float.NaN;
+        }
+
+        /// <summary>
+        /// Splits a triangle by the given split plane and returns two new split AABBs.
+        /// </summary>
+        /// <param name="TriID">The triangle ID to split</param>
+        /// <param name="box">The (split) AABB of the triangle. This box may not cover
+        /// the whole span of the triangle, but it must intersect it and the split plane
+        /// must be inside this box. This box can be itself the result of a previous
+        /// split.</param>
+        /// <param name="axis">The axis of the split</param>
+        /// <param name="splitPlane">The position of the split along axis.</param>
+        /// <param name="Vertices"></param>
+        /// <param name="Indices"></param>
+        /// <param name="boxL">The resulting left split box</param>
+        /// <param name="boxR">The resulting right split box</param>
+        private static void SplitTriangle(int TriID, in AABB box, int axis, float splitPlane,
+            in List<Vector> Vertices, in List<Int32> Indices,
+            out AABB boxL, out AABB boxR)
+        {
+            boxL = new AABB();
+            boxR = new AABB();
+
+            // Fetch the vertices of this triangle
+            List<Vector> triVerts = new List<Vector>();
+            int ofs = TriID * 3;
+            triVerts.Add(Vertices[Indices[ofs++]]);
+            triVerts.Add(Vertices[Indices[ofs++]]);
+            triVerts.Add(Vertices[Indices[ofs++]]);
+
+            // Initialize the new split boxes
+            foreach (Vector v in triVerts)
+            {
+                if (Get(v, axis) <= splitPlane)
+                    boxL.Expand(v);
+                if (Get(v, axis) >= splitPlane)
+                    boxR.Expand(v);
+            }
+
+            // Intersect each edge in the triangle against the split plane and add
+            // the intersections to both boxes
+            for (int i = 0; i < 3; i++)
+            {
+                // Get the intersection for the v0 -> v1 edge
+                Vector v0 = triVerts[i];
+                Vector v1 = triVerts[(i + 1) % 3];
+
+                // Equation of the ray starting at v0 in the direction of v1:
+                //
+                //    p = v0 + t * dir
+                //
+                // where dir = v1 - v0
+                //
+                // The equation is the same on each component, so the axis is implicit.
+                // We know p, that's splitPlane along the given split axis, so we have:
+                //
+                //    splitPlane = v0[axis] + t * dir[axis]
+                //
+                // Solving for t:
+                //
+                //    t = (splitPlane - v0[axis]) / dir[axis]
+                //
+                // Then we just plug t back in the original equation to get the intersection
+                Vector dir = Sub(v1, v0);
+                float t = (splitPlane - Get(v0, axis)) / Get(dir, axis);
+                Vector p = new Vector(v0.X, v0.Y, v0.Z);
+                Mul(t, ref dir);
+                Add(ref p, dir);
+                // The intersection is within the current edge iff t is in the range [0..1]
+                if (t >= 0.0f && t <= 1.0f)
+                {
+                    boxL.Expand(p);
+                    boxR.Expand(p);
+                }
+            }
+
+            // At this point, boxL and boxR should be tight boxes around the triangle and the
+            // split plane. But maybe the input box itself is the product of a previous split.
+            // Therefore now we need to shrink the new boxes so that they aren't bigger than
+            // the initial box
+            for (int i = 0; i < 3; i++) {
+                boxL.min[i] = Math.Max(boxL.min[i], box.min[i]);
+                boxL.max[i] = Math.Min(boxL.max[i], box.max[i]);
+
+                boxR.min[i] = Math.Max(boxR.min[i], box.min[i]);
+                boxR.max[i] = Math.Min(boxR.max[i], box.max[i]);
+            }
         }
 
         public static void SaveOBJ(string sOutFileName, List<Vector> Vertices, List<int> Indices)
