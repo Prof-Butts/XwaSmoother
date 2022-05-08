@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Runtime.InteropServices;
 
 using JeremyAnsel.Xwa.Opt;
 using XwaOpter;
@@ -127,10 +128,58 @@ namespace XwaSmoother
 
     public class BVHEncoder
     {
+        // BVHNode4 class that looks like a C union. I ended up not needing this after all,
+        // but it's nice to know how it's done.
+#if DISABLED
+        [System.Runtime.InteropServices.StructLayout(LayoutKind.Explicit)]
+        public class BVHNode4
+        {
+            [System.Runtime.InteropServices.FieldOffset(0)]
+            public Int32 TriID;
+            [System.Runtime.InteropServices.FieldOffset(4)]
+            public Int32 parent;
+
+            [System.Runtime.InteropServices.FieldOffset(8)]
+            public float v0x;
+            [System.Runtime.InteropServices.FieldOffset(12)]
+            public float v0y;
+            [System.Runtime.InteropServices.FieldOffset(16)]
+            public float v0z;
+
+            [System.Runtime.InteropServices.FieldOffset(20)]
+            public float v1x;
+            [System.Runtime.InteropServices.FieldOffset(24)]
+            public float v1y;
+            [System.Runtime.InteropServices.FieldOffset(28)]
+            public float v1z;
+
+            [System.Runtime.InteropServices.FieldOffset(32)]
+            public Int32 child0;
+            [System.Runtime.InteropServices.FieldOffset(32)]
+            public float v2x;
+
+            [System.Runtime.InteropServices.FieldOffset(36)]
+            public Int32 child1;
+            [System.Runtime.InteropServices.FieldOffset(36)]
+            public float v2y;
+
+            [System.Runtime.InteropServices.FieldOffset(40)]
+            public Int32 child2;
+            [System.Runtime.InteropServices.FieldOffset(40)]
+            public float v2z;
+
+            [System.Runtime.InteropServices.FieldOffset(44)]
+            public Int32 child3;
+        }
+#endif
+
         // In the encoded BVH nodes we can either store triangle indices, or the triangle vertices
         // themselves. If we store indices, we're probably going to have a smaller tree, but lower
         // performance because we need to do multiple memory reads.
         // If we store the geometry in the BVH leaves, we get a bigger tree, but better performance.
+
+        // Also, when loading multiple OPTs, it's probably easier to embed the geometry in the tree.
+        // That way we don't have to worry about indices referencing vertices in other buffers.
 
         // float vertices[9]; This is all we need to store a triangle: 3 vertices, and each vertex has 3 floats
         // However, we need a way to tell if the current node is an internal node, or a geometry node. So we need
@@ -180,6 +229,24 @@ namespace XwaSmoother
             return ofs;
         }
 
+        public static unsafe int EncodeVector(byte* dst, int ofs, Vector V)
+        {
+            ofs = EncodeFloat(dst, ofs, V.X);
+            ofs = EncodeFloat(dst, ofs, V.Y);
+            ofs = EncodeFloat(dst, ofs, V.Z);
+            return ofs;
+        }
+
+        public static unsafe int EncodeVector4(byte* dst, int ofs, Vector V)
+        {
+            float w = 1.0f;
+            ofs = EncodeFloat(dst, ofs, V.X);
+            ofs = EncodeFloat(dst, ofs, V.Y);
+            ofs = EncodeFloat(dst, ofs, V.Z);
+            ofs = EncodeFloat(dst, ofs, w);
+            return ofs;
+        }
+
         public static unsafe byte[] EncodeAABB(in AABB aabb)
         {
             byte[] data = new byte[sizeof(float) * 3 * 2];
@@ -217,24 +284,59 @@ namespace XwaSmoother
             return data;
         }
 
-        public static unsafe byte[] EncodeTreeNode4(IGenericTree T, Int32 parent, List<Int32> children)
+        /// <summary>
+        /// Encode a BVH4 node using either Indexed or Embedded Geometry.
+        /// </summary>
+        public static unsafe byte[] EncodeTreeNode4(IGenericTree T, Int32 parent, List<Int32> children,
+            bool EmbedVertices, List<Vector> Vertices, List<Int32> Indices)
         {
             byte[] data = new byte[LBVH.ENCODED_TREE_NODE_SIZE_BVH4];
             AABB box = T.GetBox();
+            int TriID = T.GetTriID();
+            int padding = 0;
             int ofs = 0;
-            fixed (byte* dst = &data[0])
+
+            // This leaf node must have its vertices embedded in the node
+            if (EmbedVertices && TriID != -1)
             {
-                // 4 bytes
-                ofs = EncodeInt32(dst, ofs, T.GetTriID());
-                // 12 bytes
-                ofs = EncodeXwVector3(dst, ofs, box.min);
-                // 12 bytes
-                ofs = EncodeXwVector3(dst, ofs, box.max);
-                // 4 bytes
-                ofs = EncodeInt32(dst, ofs, parent);
-                // 4 bytes for each children = 16 bytes
-                for (int i = 0; i < 4; i++)
-                    ofs = EncodeInt32(dst, ofs, children[i]);
+                int vertofs = TriID * 3;
+                Vector v0 = Vertices[Indices[vertofs]];
+                Vector v1 = Vertices[Indices[vertofs + 1]];
+                Vector v2 = Vertices[Indices[vertofs + 2]];
+
+                fixed (byte* dst = &data[0])
+                {
+                    ofs = EncodeInt32(dst, ofs, TriID);
+                    ofs = EncodeInt32(dst, ofs, parent);
+                    ofs = EncodeInt32(dst, ofs, padding);
+                    ofs = EncodeInt32(dst, ofs, padding);
+                    // 16 bytes 
+
+                    ofs = EncodeVector4(dst, ofs, v0);
+                    // 32 bytes
+                    ofs = EncodeVector4(dst, ofs, v1);
+                    // 48 bytes
+                    ofs = EncodeVector4(dst, ofs, v2);
+                    // 64 bytes
+                }
+            }
+            else
+            {
+                fixed (byte* dst = &data[0])
+                {
+                    ofs = EncodeInt32(dst, ofs, TriID);
+                    ofs = EncodeInt32(dst, ofs, parent);
+                    ofs = EncodeInt32(dst, ofs, padding);
+                    ofs = EncodeInt32(dst, ofs, padding);
+                    // 16 bytes
+                    ofs = EncodeXwVector4(dst, ofs, box.min);
+                    // 32 bytes
+                    ofs = EncodeXwVector4(dst, ofs, box.max);
+                    // 48 bytes
+                    for (int i = 0; i < 4; i++)
+                        ofs = EncodeInt32(dst, ofs, children[i]);
+                    // 64 bytes
+                }
             }
 
             if (ofs != LBVH.ENCODED_TREE_NODE_SIZE_BVH4)
@@ -480,7 +582,8 @@ namespace XwaSmoother
     {
         public const float OPT_TO_METERS = 1.0f / 40.96f;
         public const int ENCODED_TREE_NODE_SIZE_BVH2 = 48;
-        public const int ENCODED_TREE_NODE_SIZE_BVH4 = 48;
+        public const int ENCODED_TREE_NODE_SIZE_BVH4 = 64;
+        public const bool g_EmbedVertices = true;
 
         private static void Add(ref Vector A, Vector B)
         {
@@ -711,43 +814,51 @@ namespace XwaSmoother
             if (T.IsLeaf())
                 return new QTreeNode(T.TriID, T.box);
 
-            // In a standard BVH all internal nodes have two children
+            // In a standard BVH all internal nodes have two children, but in BVHs with
+            // embedded geometry, the immediate parents of leaves only have one child
+            // (the left one). So, the right child may be null in this case.
             TreeNode L = T.left;
             TreeNode R = T.right;
             int nextchild = 0;
 
-            if (L.IsLeaf())
-                children[nextchild++] = new QTreeNode(L.TriID, L.box);
-            else
+            if (L != null)
             {
-                if (L.left != null)
-                    if (L.left.IsLeaf())
-                        children[nextchild++] = new QTreeNode(L.left.TriID, L.left.box);
-                    else
-                        children[nextchild++] = BinTreeToQTree(L.left);
+                if (L.IsLeaf())
+                    children[nextchild++] = new QTreeNode(L.TriID, L.box);
+                else
+                {
+                    if (L.left != null)
+                        if (L.left.IsLeaf())
+                            children[nextchild++] = new QTreeNode(L.left.TriID, L.left.box);
+                        else
+                            children[nextchild++] = BinTreeToQTree(L.left);
 
-                if (L.right != null)
-                    if (L.right.IsLeaf())
-                        children[nextchild++] = new QTreeNode(L.right.TriID, L.right.box);
-                    else
-                        children[nextchild++] = BinTreeToQTree(L.right);
+                    if (L.right != null)
+                        if (L.right.IsLeaf())
+                            children[nextchild++] = new QTreeNode(L.right.TriID, L.right.box);
+                        else
+                            children[nextchild++] = BinTreeToQTree(L.right);
+                }
             }
 
-            if (R.IsLeaf())
-                children[nextchild++] = new QTreeNode(R.TriID, R.box);
-            else
+            if (R != null)
             {
-                if (R.left != null)
-                    if (R.left.IsLeaf())
-                        children[nextchild++] = new QTreeNode(R.left.TriID, R.left.box);
-                    else
-                        children[nextchild++] = BinTreeToQTree(R.left);
+                if (R.IsLeaf())
+                    children[nextchild++] = new QTreeNode(R.TriID, R.box);
+                else
+                {
+                    if (R.left != null)
+                        if (R.left.IsLeaf())
+                            children[nextchild++] = new QTreeNode(R.left.TriID, R.left.box);
+                        else
+                            children[nextchild++] = BinTreeToQTree(R.left);
 
-                if (R.right != null)
-                    if (R.right.IsLeaf())
-                        children[nextchild++] = new QTreeNode(R.right.TriID, R.right.box);
-                    else
-                        children[nextchild++] = BinTreeToQTree(R.right);
+                    if (R.right != null)
+                        if (R.right.IsLeaf())
+                            children[nextchild++] = new QTreeNode(R.right.TriID, R.right.box);
+                        else
+                            children[nextchild++] = BinTreeToQTree(R.right);
+                }
             }
 
             return new QTreeNode(-1, children);
@@ -1227,6 +1338,8 @@ namespace XwaSmoother
         private static TreeNode BuildSBVHFast(ref List<BoxRef> boxes, in int leftIdx, in int rightIdx)
         {
             int split_idx = -1;
+            // Indexed (i.e. non-embedded) Geometry:
+            /*
             if (leftIdx == rightIdx)
                 return new TreeNode(boxes[leftIdx].TriID, boxes[leftIdx].box);
 
@@ -1239,6 +1352,30 @@ namespace XwaSmoother
                     box,
                     new TreeNode(boxes[leftIdx].TriID, boxes[leftIdx].box),
                     new TreeNode(boxes[rightIdx].TriID, boxes[rightIdx].box));
+            }
+            */
+
+            // Embedded Geometry:
+            // It may seem redundant to have an inner node with the same box as the leaf,
+            // but when this tree gets encoded, the leaf node has its box replaced with
+            // the embedded vertices. Also, we need the leaves to have the right boxes for
+            // the refit step.
+            if (leftIdx == rightIdx)
+                return new TreeNode(-1, boxes[leftIdx].box,
+                    new TreeNode(boxes[leftIdx].TriID, boxes[leftIdx].box), null);
+
+            if (leftIdx + 1 == rightIdx)
+            {
+                AABB box = new AABB();
+                box.Expand(boxes[leftIdx].box);
+                box.Expand(boxes[rightIdx].box);
+                return new TreeNode(-1,
+                    box,
+                    new TreeNode(-1, boxes[leftIdx].box,
+                        new TreeNode(boxes[leftIdx].TriID, boxes[leftIdx].box), null),
+                    new TreeNode(-1, boxes[rightIdx].box,
+                        new TreeNode(boxes[rightIdx].TriID, boxes[rightIdx].box), null)
+                );
             }
 
             // Get the bounding box for this range
@@ -1549,7 +1686,7 @@ namespace XwaSmoother
             SaveBVHToOBJ("c:\\temp\\BVH4.obj", Q, Vertices, Indices);
             //PrintTree("", Q);
 #endif
-            SaveBVH(sOutFileName, NumNodes, Q, Vertices, Indices, out sError);
+            SaveBVH(sOutFileName, NumNodes, Q, g_EmbedVertices, Vertices, Indices, out sError);
             Console.WriteLine("Saved BVH4: " + sOutFileName);
             Q = null;
 #endif
@@ -1559,7 +1696,8 @@ namespace XwaSmoother
         }
 
         private static void SaveBVH(string sOutFileName, int NumNodes, IGenericTree T,
-            List<Vector> Vertices, List<int> Indices, out string sError)
+            bool EmbedVertices, List<Vector> Vertices, List<int> Indices,
+            out string sError)
         {
             System.IO.BinaryWriter file = new BinaryWriter(File.OpenWrite(sOutFileName));
             sError = "";
@@ -1571,46 +1709,49 @@ namespace XwaSmoother
                 file.Write(data);
             }
 
-            // Save the vertices
+            if (!EmbedVertices)
             {
-                // Write the number of vertices
-                UInt32 NumVertices = (UInt32)Vertices.Count;
-                file.Write(NumVertices);
-                // Write the vertices
-                float[] data = new float[3 * Vertices.Count];
-                int ofs = 0;
-                for (int i = 0; i < Vertices.Count; i++)
+                // Save the vertices
                 {
-                    data[ofs + 0] = Vertices[i].X;
-                    data[ofs + 1] = Vertices[i].Y;
-                    data[ofs + 2] = Vertices[i].Z;
-                    ofs += 3;
+                    // Write the number of vertices
+                    UInt32 NumVertices = (UInt32)Vertices.Count;
+                    file.Write(NumVertices);
+                    // Write the vertices
+                    float[] data = new float[3 * Vertices.Count];
+                    int ofs = 0;
+                    for (int i = 0; i < Vertices.Count; i++)
+                    {
+                        data[ofs + 0] = Vertices[i].X;
+                        data[ofs + 1] = Vertices[i].Y;
+                        data[ofs + 2] = Vertices[i].Z;
+                        ofs += 3;
+                    }
+
+                    for (int i = 0; i < ofs; i++)
+                        file.Write(data[i]);
                 }
 
-                for (int i = 0; i < ofs; i++)
-                    file.Write(data[i]);
-            }
-
-            // Save the indices
-            {
-                // Write the number of indices
-                UInt32 NumIndices = (UInt32)Indices.Count;
-                file.Write(NumIndices);
-                // Write the indices
-                int[] data = new int[Indices.Count];
-                int ofs = 0;
-                for (int i = 0; i < Indices.Count; i++, ofs++)
+                // Save the indices
                 {
-                    data[ofs] = Indices[i];
-                }
+                    // Write the number of indices
+                    UInt32 NumIndices = (UInt32)Indices.Count;
+                    file.Write(NumIndices);
+                    // Write the indices
+                    int[] data = new int[Indices.Count];
+                    int ofs = 0;
+                    for (int i = 0; i < Indices.Count; i++, ofs++)
+                    {
+                        data[ofs] = Indices[i];
+                    }
 
-                for (int i = 0; i < ofs; i++)
-                    file.Write(data[i]);
+                    for (int i = 0; i < ofs; i++)
+                        file.Write(data[i]);
+                }
             }
 
             // Save the BVH
             {
-                SaveBVH(file, NumNodes, T);
+                EncodeNodes(file, NumNodes, T, EmbedVertices, Vertices, Indices);
             }
 
             // We don't need to save the AABBs nor Vertex Counts anymore
@@ -1640,7 +1781,11 @@ namespace XwaSmoother
             file.Close();
         }
 
-        private static void SaveBVH(BinaryWriter file, int NumNodes, IGenericTree root)
+        /// <summary>
+        /// Encodes the nodes in a BVH.
+        /// </summary>
+        private static void EncodeNodes(BinaryWriter file, int NumNodes, IGenericTree root, bool EmbedVertices=false,
+            List<Vector> Vertices=null, List<Int32> Indices=null)
         {
             if (root == null)
                 return;
@@ -1648,6 +1793,7 @@ namespace XwaSmoother
             int arity = root.GetArity();
             // Write the number of nodes in the tree
             file.Write(NumNodes);
+            Console.WriteLine("Encoding " + NumNodes + " BVH nodes to disk");
 
             // A breadth-first traversal will ensure that each level of the tree is written to disk
             // before advancing to the next level. We can thus keep track of the offset in the file
@@ -1685,7 +1831,8 @@ namespace XwaSmoother
                             childOfs.Add(i < children.Count ? nextNode + i : -1);
 
                         file.Write(
-                            BVHEncoder.EncodeTreeNode4(T, -1 /* parent (TODO) */, childOfs)
+                            BVHEncoder.EncodeTreeNode4(T, -1 /* parent (TODO) */, childOfs,
+                                EmbedVertices, Vertices, Indices)
                         );
 
                         // Enqueue the children

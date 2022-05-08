@@ -90,30 +90,6 @@ namespace XwaOpter
         [STAThread]
         static void Main(string[] args)
         {
-            AABB box1 = new AABB(), box2 = new AABB();
-            box1.min[0] = -1;
-            box1.min[1] = -2;
-            box1.min[2] = -3;
-
-            box1.max[0] = 1;
-            box1.max[1] = 2;
-            box1.max[2] = 3;
-
-            box2.min[0] = -2;
-            box2.min[1] = -4;
-            box2.min[2] = -6;
-
-            box2.max[0] = 3;
-            box2.max[1] = 6;
-            box2.max[2] = 8;
-
-            AABB box = new AABB();
-            box.Expand(box2);
-            box.Expand(box1);
-            Console.WriteLine("box1: " + box1);
-            Console.WriteLine("box2: " + box2);
-            Console.WriteLine("box: " + box);
-
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new MainForm());
