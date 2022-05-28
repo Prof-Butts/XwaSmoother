@@ -356,11 +356,13 @@ namespace XwaSmoother
         int GetTriID();
         List<IGenericTree> GetChildren();
         IGenericTree GetParent();
+        void SetNumNodes(int numNodes);
+        int GetNumNodes();
     }
 
     public class TreeNode : IGenericTree
     {
-        public int TriID;
+        public int TriID, numNodes;
         public TreeNode left, right, parent;
         public AABB box;
         public MortonCode_t code;
@@ -371,6 +373,7 @@ namespace XwaSmoother
             left = right = parent = null;
             box = new AABB();
             code = 0;
+            numNodes = 0;
         }
 
         public TreeNode(int TriID)
@@ -379,6 +382,7 @@ namespace XwaSmoother
             left = right = parent = null;
             box = new AABB();
             code = 0;
+            numNodes = 0;
         }
 
         public TreeNode(int TriID, MortonCode_t code)
@@ -386,7 +390,8 @@ namespace XwaSmoother
             this.TriID = TriID;
             this.code = code;
             left = right = parent = null;
-            box = new AABB();
+            this.box = new AABB();
+            this.numNodes = 0;
         }
 
         public TreeNode(int TriID, TreeNode left, TreeNode right)
@@ -397,6 +402,7 @@ namespace XwaSmoother
             this.parent = null;
             this.box = new AABB();
             this.code = 0;
+            this.numNodes = 0;
         }
 
         public TreeNode(int TriID, AABB box, TreeNode left, TreeNode right)
@@ -407,6 +413,7 @@ namespace XwaSmoother
             this.parent = null;
             this.box = box;
             this.code = 0;
+            this.numNodes = 0;
         }
 
         public TreeNode(int TriID, TreeNode left, TreeNode right, TreeNode parent)
@@ -417,6 +424,7 @@ namespace XwaSmoother
             this.parent = parent;
             this.box = new AABB();
             this.code = 0;
+            this.numNodes = 0;
         }
 
         public TreeNode(int TriID, AABB box)
@@ -428,6 +436,7 @@ namespace XwaSmoother
             this.code = 0;
             this.box = new AABB();
             this.box.Expand(box);
+            this.numNodes = 0;
         }
 
         public int GetArity()
@@ -464,11 +473,21 @@ namespace XwaSmoother
         {
             return this.parent;
         }
+
+        public void SetNumNodes(int numNodes)
+        {
+            this.numNodes = numNodes;
+        }
+
+        public int GetNumNodes()
+        {
+            return this.numNodes;
+        }
     }
 
     public class QTreeNode : IGenericTree
     {
-        public int TriID;
+        public int TriID, numNodes;
         public QTreeNode parent;
         public QTreeNode[] children;
         public AABB box;
@@ -480,6 +499,7 @@ namespace XwaSmoother
             this.box = null;
             this.code = 0;
             this.children = new QTreeNode[4];
+            this.numNodes = 0;
             for (int i = 0; i < 4; i++)
                 this.children[i] = null;
         }
@@ -490,6 +510,7 @@ namespace XwaSmoother
             this.box = null;
             this.code = 0;
             this.children = new QTreeNode[4];
+            this.numNodes = 0;
             for (int i = 0; i < 4; i++)
                 this.children[i] = children[i];
         }
@@ -500,6 +521,7 @@ namespace XwaSmoother
             this.children = new QTreeNode[4];
             this.box = box;
             this.code = 0;
+            this.numNodes = 0;
             for (int i = 0; i < 4; i++)
                 this.children[i] = null;
         }
@@ -510,6 +532,7 @@ namespace XwaSmoother
             this.box = box;
             this.parent = parent;
             this.children = new QTreeNode[4];
+            this.numNodes = 0;
             for (int i = 0; i < 4; i++)
                 this.children[i] = children[i];
         }
@@ -550,6 +573,16 @@ namespace XwaSmoother
         {
             return parent;
         }
+
+        public void SetNumNodes(int numNodes)
+        {
+            this.numNodes = numNodes;
+        }
+
+        public int GetNumNodes()
+        {
+            return this.numNodes;
+        }
     }
 
     public class BoxRefComparer : IComparer<BoxRef>
@@ -578,12 +611,66 @@ namespace XwaSmoother
         }
     }
 
+    public class AuxBox
+    {
+        public MortonCode_t[] min;
+        public MortonCode_t[] max;
+
+        public void InitMinMax()
+        {
+            min = new MortonCode_t[3];
+            max = new MortonCode_t[3];
+        }
+
+        public AuxBox()
+        {
+            InitMinMax();
+        }
+
+        public AuxBox(Vector normMin, Vector normMax)
+        {
+            InitMinMax();
+            this.min[0] = (uint)(normMin.X * 1023.0f);
+            this.min[1] = (uint)(normMin.Y * 1023.0f);
+            this.min[2] = (uint)(normMin.Z * 1023.0f);
+
+            this.max[0] = (uint)(normMax.X * 1023.0f);
+            this.max[1] = (uint)(normMax.Y * 1023.0f);
+            this.max[2] = (uint)(normMax.Z * 1023.0f);
+        }
+
+        public AuxBox(XwVector normMin, XwVector normMax)
+        {
+            InitMinMax();
+            this.min[0] = (uint)(normMin.x * 1023.0f);
+            this.min[1] = (uint)(normMin.y * 1023.0f);
+            this.min[2] = (uint)(normMin.z * 1023.0f);
+
+            this.max[0] = (uint)(normMax.x * 1023.0f);
+            this.max[1] = (uint)(normMax.y * 1023.0f);
+            this.max[2] = (uint)(normMax.z * 1023.0f);
+        }
+    }
+
     public class LBVH
     {
         public const float OPT_TO_METERS = 1.0f / 40.96f;
         public const int ENCODED_TREE_NODE_SIZE_BVH2 = 48;
         public const int ENCODED_TREE_NODE_SIZE_BVH4 = 64;
         public const bool g_EmbedVertices = true;
+        /// <summary>
+        /// When true, build one BLAS per mesh and write them together in a single
+        /// .bvh file. The header for this type of file encodes the number of trees
+        /// in the file.
+        /// </summary>
+        public const bool g_BuildMultiBLAS = false;
+
+        public enum BuilderType
+        {
+            LBVH,
+            SBVH
+        };
+        public static BuilderType g_Builder = BuilderType.LBVH;
 
         private static void Add(ref Vector A, Vector B)
         {
@@ -713,7 +800,7 @@ namespace XwaSmoother
         }
 
         // From https://stackoverflow.com/questions/1024754/how-to-compute-a-3d-morton-number-interleave-the-bits-of-3-ints
-        private static MortonCode_t GetMortonCode32(uint x, uint y, uint z)
+        public static MortonCode_t GetMortonCode32(uint x, uint y, uint z)
         {
             return SpreadBits(x, 2) | SpreadBits(y, 1) | SpreadBits(z, 0);
         }
@@ -1296,9 +1383,21 @@ namespace XwaSmoother
         private static TreeNode BuildLBVH(in List<BoxRef> boxes, int i, int j)
         {
             int split_idx = -1;
-            
+
+            // Indexed Geometry
+            /*
             if (i == j)
                 return new TreeNode(boxes[i].TriID, boxes[i].code);
+            */
+
+            // Embedded Geometry
+            // It may seem redundant to have an inner node with the same box as the leaf,
+            // but when this tree gets encoded, the leaf node has its box replaced with
+            // the embedded vertices. Also, we need the leaves to have the right boxes for
+            // the refit step.
+            if (i == j)
+                return new TreeNode(-1, boxes[i].box,
+                        new TreeNode(boxes[i].TriID, boxes[i].box), null);
 
             int fbh = delta32(boxes[i].code, boxes[j].code);
             if (fbh == -1)
@@ -1527,7 +1626,7 @@ namespace XwaSmoother
                 BuildSBVHStable(ref boxes, split_idx, rightIdx)
             );
         }
-   
+
         public static void ComputeBVH(string sInFileName, string sOutFileName, out string sError)
         {
             var opt = OptFile.FromFile(sInFileName);
@@ -1656,8 +1755,18 @@ namespace XwaSmoother
             //int NumNodes = 0;
             //Refit(T, out NumNodes);
 
-            //TreeNode T = BuildSBVHStable(ref Boxes, 0, numPrims - 1);
-            TreeNode T = BuildSBVHFast(ref Boxes, 0, numPrims - 1);
+            TreeNode T = null;
+            switch (g_Builder) {
+                case BuilderType.LBVH:
+                    Console.WriteLine("Building LBVH");
+                    T = BuildLBVH(Boxes, 0, numPrims - 1);
+                    break;
+                case BuilderType.SBVH:
+                    Console.WriteLine("Building SBVH");
+                    //T = BuildSBVHStable(ref Boxes, 0, numPrims - 1);
+                    T = BuildSBVHFast(ref Boxes, 0, numPrims - 1);
+                    break;
+            }
 
 #if DEBUG
             //SaveOBJ("c:\\Temp\\LBVHInput-after-sort.obj", Vertices, Indices);
@@ -1693,6 +1802,160 @@ namespace XwaSmoother
 
             // Tidy up
             T = null;
+        }
+
+        /// <summary>
+        /// Builds one BLAS per mesh and puts them all together in the same output file.
+        /// </summary>
+        /// <param name="sInFileName"></param>
+        /// <param name="sOutFileName"></param>
+        /// <param name="sError"></param>
+        public static void ComputeMultiBLAS(string sInFileName, string sOutFileName, out string sError)
+        {
+            var opt = OptFile.FromFile(sInFileName);
+            Console.WriteLine("Loaded " + sInFileName);
+
+            List<AABB> MeshAABBs = new List<AABB>();
+            List<List<Vector>> VerticesListList = new List<List<Vector>>();
+            List<List<Int32>> IndicesListList = new List<List<int>>();
+            List<IGenericTree> QTrees = new List<IGenericTree>();
+            AABB sceneBox = new AABB();
+            sError = "";
+
+            // Pre-pass 1:
+            // * Remove all nonzero LODs
+            // * Convert all faces into indexed triangles
+            // * Get the scene bounds
+            for (int meshIdx = 0; meshIdx < opt.Meshes.Count; meshIdx++)
+            {   
+                List<Vector> Vertices = new List<Vector>();
+                List<Int32> Indices = new List<int>();
+                List<BoxRef> Boxes = new List<BoxRef>();
+                AABB meshAABB = new AABB();
+                int TriId = 0;
+                var mesh = opt.Meshes[meshIdx];
+
+                // Remove all the LODs, except for the first one (we'll handle LODs later)
+                for (int i = 1; i < mesh.Lods.Count; i++)
+                    mesh.Lods.RemoveAt(i);
+
+                // Copy the vertices to their final destination and update the mesh and scene
+                // AABBs
+                for (int i = 0; i < mesh.Vertices.Count; i++)
+                {
+                    var V = mesh.Vertices[i];
+                    Vertices.Add(V);
+                    meshAABB.Expand(V);
+                    sceneBox.Expand(V);
+                }
+                MeshAABBs.Add(meshAABB);
+
+                //foreach (var Lod in mesh.Lods)
+                // Let's do a BVH for the first LOD for now...
+                var Lod = mesh.Lods[0];
+                {
+                    // Populate the Indices list and build the boxrefs
+                    foreach (var faceGroup in Lod.FaceGroups)
+                    {
+                        foreach (var face in faceGroup.Faces)
+                        {
+                            BoxRef boxref;
+                            int NumIndices;
+
+                            // Add the indices for the current triangle
+                            Indices.Add(face.VerticesIndex.A);
+                            Indices.Add(face.VerticesIndex.B);
+                            Indices.Add(face.VerticesIndex.C);
+                            NumIndices = Indices.Count;
+
+                            // Update the current box
+                            boxref = new BoxRef();
+                            boxref.TriID = TriId++;
+                            boxref.box = new AABB();
+                            boxref.box.Expand(Vertices[Indices[NumIndices - 3]]);
+                            boxref.box.Expand(Vertices[Indices[NumIndices - 2]]);
+                            boxref.box.Expand(Vertices[Indices[NumIndices - 1]]);
+                            Boxes.Add(boxref);
+
+                            // Add the second triangle if this is a quad
+                            if (face.VertexNormalsIndex.D != -1)
+                            {
+                                Indices.Add(face.VerticesIndex.A);
+                                Indices.Add(face.VerticesIndex.C);
+                                Indices.Add(face.VerticesIndex.D);
+                                NumIndices = Indices.Count;
+
+                                // Update the current box
+                                boxref = new BoxRef();
+                                boxref.TriID = TriId++;
+                                boxref.box = new AABB();
+                                boxref.box.Expand(Vertices[Indices[NumIndices - 3]]);
+                                boxref.box.Expand(Vertices[Indices[NumIndices - 2]]);
+                                boxref.box.Expand(Vertices[Indices[NumIndices - 1]]);
+                                Boxes.Add(boxref);
+                            }
+                        }
+                    }
+                }
+
+#if DEBUG
+                // Checkpoint: save an OBJ file and check that everything looks fine
+                SaveOBJ("c:\\Temp\\LBVHInput.obj", Vertices, Indices);
+#endif
+
+                // Pre-pass 2:
+                // * Compute the Morton codes.
+                foreach (BoxRef boxref in Boxes)
+                {
+                    XwVector centroid = boxref.box.GetCentroid();
+                    Vector C = new Vector(centroid.x, centroid.y, centroid.z);
+                    boxref.centroid = C;
+
+                    // Get the Morton code
+                    Normalize(ref C, meshAABB);
+                    boxref.code = GetMortonCode32(C);
+                }
+
+                // Sort the primitives by their Morton codes
+                Boxes.Sort();
+
+                int numPrims = Boxes.Count;
+                Console.WriteLine("numPrims: " + numPrims);
+
+                // Build the tree proper
+                TreeNode T = BuildSBVHFast(ref Boxes, 0, numPrims - 1);
+
+                // DEBUG, let's dump the BVH tree structure
+#if DEBUG
+                //SaveBVHToOBJ("c:\\temp\\BVH2.obj", T, Vertices, Indices);
+#endif
+
+                // Convert to BVH4 and save it to the list of QTrees
+                QTreeNode Q = BinTreeToQTree(T);
+                int NumNodes = 0;
+                Refit(Q, out NumNodes);
+                Q.SetNumNodes(NumNodes);
+                QTrees.Add(Q);
+                VerticesListList.Add(Vertices);
+                IndicesListList.Add(Indices);
+#if DEBUG
+                //SaveBVHToOBJ("c:\\temp\\BVH4-" + meshIdx + ".obj", Q, Vertices, Indices);
+                //PrintTree("", Q);
+#endif
+                //SaveBVH(sOutFileName, NumNodes, Q, g_EmbedVertices, Vertices, Indices, out sError);
+                //Console.WriteLine("Saved BVH4: " + sOutFileName);
+                //Q = null;
+                
+                // Tidy up
+                T = null;
+            }
+            Console.WriteLine("Scene bounds: " + sceneBox.ToString());
+
+            // Save the list of QTrees to a file
+            SaveMultiBLAS(sOutFileName, QTrees, VerticesListList, IndicesListList, out sError);
+
+            // Tidy up
+            QTrees.Clear();
         }
 
         private static void SaveBVH(string sOutFileName, int NumNodes, IGenericTree T,
@@ -1777,6 +2040,38 @@ namespace XwaSmoother
                 }
             }
 #endif
+
+            file.Close();
+        }
+
+        private static void SaveMultiBLAS(string sOutFileName, List<IGenericTree> Trees,
+            List<List<Vector>> VerticesListList, List<List<Int32>> IndicesListList,
+            out string sError)
+        {
+            System.IO.BinaryWriter file = new BinaryWriter(File.OpenWrite(sOutFileName));
+            sError = "";
+
+            // Save the Magic Word/Version
+            {
+                string Magic = "BVH4-1.1";
+                byte[] data = Encoding.ASCII.GetBytes(Magic);
+                file.Write(data);
+            }
+
+            // Save the number of trees in the list
+            {
+                UInt32 NumTrees = (UInt32 )Trees.Count;
+                file.Write(NumTrees);
+            }
+
+            // Save the BLASes
+            {
+                for (int i = 0; i < Trees.Count; i++)
+                {
+                    EncodeNodes(file, Trees[i].GetNumNodes(), Trees[i], true,
+                        VerticesListList[i], IndicesListList[i]);
+                }
+            }
 
             file.Close();
         }

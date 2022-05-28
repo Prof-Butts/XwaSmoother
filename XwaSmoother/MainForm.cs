@@ -131,7 +131,11 @@ namespace XwaSmoother
             string sOutFileName = Path.GetFileNameWithoutExtension(sInFileName);
             sOutFileName = Path.Combine(sInPath, sOutFileName + ".bvh");
 
-            LBVH.ComputeBVH(sInFileName, sOutFileName, out sError);
+            if (LBVH.g_BuildMultiBLAS)
+                LBVH.ComputeMultiBLAS(sInFileName, sOutFileName, out sError);
+            else
+                LBVH.ComputeBVH(sInFileName, sOutFileName, out sError);
+
             if (sError.Length > 0)
             {
                 MessageBox.Show(sError, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
