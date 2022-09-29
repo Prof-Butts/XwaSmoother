@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using XwaSmoother;
+using XwaSmootherEngine;
 
 namespace XwaOpter
 {

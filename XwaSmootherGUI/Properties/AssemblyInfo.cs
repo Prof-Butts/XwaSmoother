@@ -5,12 +5,12 @@ using System.Runtime.InteropServices;
 // Les informations générales relatives à un assembly dépendent de 
 // l'ensemble d'attributs suivant. Changez les valeurs de ces attributs pour modifier les informations
 // associées à un assembly.
-[assembly: AssemblyTitle("XwaOpter")]
+[assembly: AssemblyTitle("XwaSmoother")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Jérémy Ansel")]
-[assembly: AssemblyProduct("XwaOpter")]
-[assembly: AssemblyCopyright("Copyright © 2004 Ooc, 2019 Jérémy Ansel")]
+[assembly: AssemblyCompany("Jérémy Ansel, Leo Reyes")]
+[assembly: AssemblyProduct("XwaSmoother")]
+[assembly: AssemblyCopyright("Copyright © 2004 Ooc, 2019 Jérémy Ansel, 2022 Leo Reyes")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -32,6 +32,6 @@ using System.Runtime.InteropServices;
 // Vous pouvez spécifier toutes les valeurs ou indiquer les numéros de build et de révision par défaut 
 // en utilisant '*', comme indiqué ci-dessous :
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("2.3.0.0")]
-[assembly: AssemblyFileVersion("2.3.0.0")]
-[assembly: AssemblyInformationalVersion("2.3.0.0")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyInformationalVersion("1.0.0.0")]

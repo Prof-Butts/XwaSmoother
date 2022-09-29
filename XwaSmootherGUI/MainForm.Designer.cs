@@ -178,7 +178,7 @@
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(1);
             this.Name = "MainForm";
-            this.Text = "OPT Smoother & Tangent Map Generator 1.1";
+            this.Text = "Xwa OPT Smoother";
             this.ResumeLayout(false);
             this.PerformLayout();
 
