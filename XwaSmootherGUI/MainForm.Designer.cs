@@ -42,6 +42,7 @@
             this.smoothButton = new System.Windows.Forms.Button();
             this.overwriteCheckBox = new System.Windows.Forms.CheckBox();
             this.xwaDirBrowserDialog = new System.Windows.Forms.FolderBrowserDialog();
+            this.applyThrButton = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // inputFileTextBox
@@ -151,11 +152,22 @@
             // 
             this.xwaDirBrowserDialog.RootFolder = System.Environment.SpecialFolder.ProgramFilesX86;
             // 
+            // applyThrButton
+            // 
+            this.applyThrButton.Location = new System.Drawing.Point(903, 150);
+            this.applyThrButton.Name = "applyThrButton";
+            this.applyThrButton.Size = new System.Drawing.Size(98, 23);
+            this.applyThrButton.TabIndex = 8;
+            this.applyThrButton.Text = "&Apply thr";
+            this.applyThrButton.UseVisualStyleBackColor = true;
+            this.applyThrButton.Click += new System.EventHandler(this.applyThrButton_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1012, 374);
+            this.Controls.Add(this.applyThrButton);
             this.Controls.Add(this.overwriteCheckBox);
             this.Controls.Add(this.smoothButton);
             this.Controls.Add(this.label3);
@@ -190,5 +202,6 @@
         private System.Windows.Forms.Button smoothButton;
         private System.Windows.Forms.CheckBox overwriteCheckBox;
         private System.Windows.Forms.FolderBrowserDialog xwaDirBrowserDialog;
+        private System.Windows.Forms.Button applyThrButton;
     }
 }

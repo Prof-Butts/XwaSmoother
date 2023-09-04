@@ -178,5 +178,13 @@ namespace XwaSmoother
 
             MessageBox.Show("Saved " + sOutFileName, "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
+
+        private void applyThrButton_Click(object sender, EventArgs e)
+        {
+            if (SmootherEngine.ApplyThresholdProfile(inputFileTextBox.Text, false))
+                Console.WriteLine("Thresholds applied");
+            else
+                Console.WriteLine("Could not apply thresholds profile");
+        }
     }
 }

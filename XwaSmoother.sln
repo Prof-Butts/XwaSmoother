@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.1705
+# Visual Studio Version 17
+VisualStudioVersion = 17.6.33723.286
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XwaSmootherGUI", "XwaSmootherGUI\XwaSmootherGUI.csproj", "{E460FCA6-3222-4F14-8938-25F27B284584}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XwaSmootherEngine", "Engine\XwaSmootherEngine.csproj", "{7EF50F6F-E050-4566-B87D-0CDFFF52E4AA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XwaAutoSmoother", "XwaAutoSmoother\XwaAutoSmoother.csproj", "{F481E184-7908-46FC-B499-8AC4D6FE359D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{7EF50F6F-E050-4566-B87D-0CDFFF52E4AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7EF50F6F-E050-4566-B87D-0CDFFF52E4AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7EF50F6F-E050-4566-B87D-0CDFFF52E4AA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F481E184-7908-46FC-B499-8AC4D6FE359D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F481E184-7908-46FC-B499-8AC4D6FE359D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F481E184-7908-46FC-B499-8AC4D6FE359D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F481E184-7908-46FC-B499-8AC4D6FE359D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
