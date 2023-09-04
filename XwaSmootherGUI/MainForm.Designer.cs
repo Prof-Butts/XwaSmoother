@@ -42,7 +42,6 @@
             this.smoothButton = new System.Windows.Forms.Button();
             this.overwriteCheckBox = new System.Windows.Forms.CheckBox();
             this.xwaDirBrowserDialog = new System.Windows.Forms.FolderBrowserDialog();
-            this.BVHButton = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // inputFileTextBox
@@ -109,9 +108,10 @@
             // 
             // thresholdsTextBox
             // 
-            this.thresholdsTextBox.Location = new System.Drawing.Point(12, 123);
+            this.thresholdsTextBox.Location = new System.Drawing.Point(12, 121);
+            this.thresholdsTextBox.Multiline = true;
             this.thresholdsTextBox.Name = "thresholdsTextBox";
-            this.thresholdsTextBox.Size = new System.Drawing.Size(885, 20);
+            this.thresholdsTextBox.Size = new System.Drawing.Size(885, 241);
             this.thresholdsTextBox.TabIndex = 6;
             // 
             // label3
@@ -138,6 +138,8 @@
             // overwriteCheckBox
             // 
             this.overwriteCheckBox.AutoSize = true;
+            this.overwriteCheckBox.Checked = true;
+            this.overwriteCheckBox.CheckState = System.Windows.Forms.CheckState.Checked;
             this.overwriteCheckBox.Location = new System.Drawing.Point(903, 98);
             this.overwriteCheckBox.Name = "overwriteCheckBox";
             this.overwriteCheckBox.Size = new System.Drawing.Size(71, 17);
@@ -149,22 +151,11 @@
             // 
             this.xwaDirBrowserDialog.RootFolder = System.Environment.SpecialFolder.ProgramFilesX86;
             // 
-            // BVHButton
-            // 
-            this.BVHButton.Location = new System.Drawing.Point(902, 154);
-            this.BVHButton.Name = "BVHButton";
-            this.BVHButton.Size = new System.Drawing.Size(98, 23);
-            this.BVHButton.TabIndex = 8;
-            this.BVHButton.Text = "Save &BVH";
-            this.BVHButton.UseVisualStyleBackColor = true;
-            this.BVHButton.Click += new System.EventHandler(this.BVHButton_Click);
-            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1012, 197);
-            this.Controls.Add(this.BVHButton);
+            this.ClientSize = new System.Drawing.Size(1012, 374);
             this.Controls.Add(this.overwriteCheckBox);
             this.Controls.Add(this.smoothButton);
             this.Controls.Add(this.label3);
@@ -199,6 +190,5 @@
         private System.Windows.Forms.Button smoothButton;
         private System.Windows.Forms.CheckBox overwriteCheckBox;
         private System.Windows.Forms.FolderBrowserDialog xwaDirBrowserDialog;
-        private System.Windows.Forms.Button BVHButton;
     }
 }
