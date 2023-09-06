@@ -757,7 +757,7 @@ namespace XwaSmootherEngine
         public static uint GetCRC(string sInFileName)
         {
             var opt = OptFile.FromFile(sInFileName);
-            Console.WriteLine("Loaded " + sInFileName);
+            //Console.WriteLine("Loaded " + sInFileName);
 
             FaceNormalMap faceNormalMap = new FaceNormalMap();
             VertexFaceListMap vertexFaceListMap = new VertexFaceListMap();
@@ -788,31 +788,31 @@ namespace XwaSmootherEngine
         }
 
         /// <summary>
-        /// Finds the Thresholds\*.thr file associated with sInFileName and tries to apply it.
+        /// Applies the thresholds in sThreshFile to the corresponding OPT file.
         /// If the CRC doesn't match, the profile won't be applied unless the `force` flag is set.
         /// </summary>
-        /// <param name="sInFileName">The name of the OPT file that will be smoothed</param>
+        /// <param name="sThreshFile">The name of the thresholds file that will be smoothed</param>
+        /// <param name="sOPTPath">The path where the OPTs are located</param>
         /// <param name="force">If set to true, then apply the threshold profile even if the CRC does not match</param>
-        /// <returns>true if the profile was applied. false otherwise.</returns>
-        public static bool ApplyThresholdProfile(string sInFileName, bool force=false)
+        /// <returns>true if the profile was applied; false otherwise.</returns>
+        public static bool ApplyThresholdProfile(string sThreshFile, string sOPTPath, bool force=false)
         {
-            string sInPath = Path.GetDirectoryName(sInFileName);
-            string sInRootFileName = Path.GetFileNameWithoutExtension(sInFileName);
-            string sThreshPath = Path.Combine(sInPath, "Thresholds");
-            string sThreshFile = Path.Combine(sThreshPath, sInRootFileName + ".thr");
-
-            if (!Directory.Exists(sThreshPath))
-            {
-                Console.WriteLine("Path: " + sThreshPath + " does not exist");
-                return false;
-            }
+            string sInRootFileName = Path.GetFileNameWithoutExtension(sThreshFile);
+            string sInFileName = Path.Combine(sOPTPath, sInRootFileName + ".opt");
 
             if (!File.Exists(sThreshFile))
             {
-                Console.WriteLine("File: " + sThreshFile + " does not exist");
+                Console.WriteLine("File: \"" + sThreshFile + "\" does not exist");
                 return false;
             }
-            Console.WriteLine("Loading: " + sThreshFile);
+
+            if (!File.Exists(sInFileName))
+            {
+                Console.WriteLine("File: \"" + sInFileName + "\" does not exist");
+                return false;
+            }
+
+            Console.WriteLine("Applying: " + sThreshFile);
 
             // Load the thresholds file
             StreamReader file = new StreamReader(new FileStream(sThreshFile, FileMode.Open));
@@ -821,7 +821,7 @@ namespace XwaSmootherEngine
             if (sCRC.StartsWith("0x"))
                 sCRC = sCRC.Substring(2);
             uint crc = uint.Parse(sCRC, System.Globalization.NumberStyles.HexNumber);
-            Console.WriteLine("CRC: 0x" + crc.ToString("x"));
+            //Console.WriteLine("CRC: 0x" + crc.ToString("x"));
 
             if (!force)
             {

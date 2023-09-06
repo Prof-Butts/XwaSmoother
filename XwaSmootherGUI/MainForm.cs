@@ -175,10 +175,29 @@ namespace XwaSmoother
 
         private void applyThrButton_Click(object sender, EventArgs e)
         {
+            string sOPTPath = Path.GetDirectoryName(inputFileTextBox.Text);
+            string sThreshPath = Path.Combine(sOPTPath, "Thresholds");
+            Console.WriteLine("Enumerating files in directory:\n" + sThreshPath);
+            Console.WriteLine("OPT path: " + sOPTPath);
+
+            string[] sThreshFiles = Directory.GetFiles(sThreshPath);
+            foreach (string sThreshFile in sThreshFiles)
+            {
+                SmootherEngine.ApplyThresholdProfile(sThreshFile, sOPTPath, false);
+            }
+
+            /*
             if (SmootherEngine.ApplyThresholdProfile(inputFileTextBox.Text, false))
+            {
                 Console.WriteLine("Thresholds applied");
+                MessageBox.Show("Applied thresholds", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
             else
+            {
                 Console.WriteLine("Could not apply thresholds profile");
+                MessageBox.Show("Thresholds could not be applied", "Failure", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            */
         }
     }
 }
