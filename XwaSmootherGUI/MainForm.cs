@@ -86,7 +86,6 @@ namespace XwaSmoother
             string sInFileName = inputFileTextBox.Text;
             string sOutFileName = outputFileTextBox.Text;
             string[] sLines = thresholdsTextBox.Lines;
-            int TotalNumMeshes = 0;
 
             string sInPath = Path.GetDirectoryName(sInFileName);
             string sInRootFileName = Path.GetFileNameWithoutExtension(sInFileName);
@@ -105,6 +104,7 @@ namespace XwaSmoother
             uint crc = SmootherEngine.GetCRC(sInFileName);
             file.WriteLine("0x" + crc.ToString("x"));
 
+            List<string> sThresholds = new List<string>();
             int lineCounter = 0;
             foreach (string sLine in sLines)
             {
@@ -120,37 +120,31 @@ namespace XwaSmoother
                     continue;
                 }
 
-                List<string> sThresholds = new List<string>();
                 sThresholds.Add(sThreshold);
-                Dictionary<int, float> Thresholds = SmootherEngine.ParseIndices(sThresholds, out string sError);
-                if (Thresholds == null)
-                {
-                    if (sError == null)
-                        MessageBox.Show("Could not parse thresholds at line: " + lineCounter,
-                            "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    else
-                        MessageBox.Show(sError, "Error at line: " + lineCounter, MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    goto exit;
-                }
-
-                if (Thresholds.Count == 0)
-                {
-                    //MessageBox.Show("No thresholds could be parsed", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    //return;
-                    Console.WriteLine("No thresholds could be parsed at line: " + lineCounter);
-                    continue;
-                }
-
-                // Only write lines to the threshold file that are actually active
                 file.WriteLine(sLine);
-                int NumMeshes = SmootherEngine.Smooth(sInFileName, sOutFileName, Thresholds);
-                Console.WriteLine(NumMeshes + " meshes smoothed");
-                TotalNumMeshes += NumMeshes;
+            }
+            file.Close();
+
+            Dictionary<int, float> Thresholds = SmootherEngine.ParseIndices(sThresholds, out string sError);
+            if (Thresholds == null)
+            {
+                if (sError == null)
+                    MessageBox.Show("Could not parse thresholds at line: " + lineCounter,
+                        "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                else
+                    MessageBox.Show(sError, "Error at line: " + lineCounter, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
 
-            MessageBox.Show(TotalNumMeshes + " meshes smoothed", "Success", MessageBoxButtons.OK);
-        exit:
-            file.Close();
+            if (Thresholds.Count == 0)
+            {
+                MessageBox.Show("No thresholds could be parsed", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            int NumMeshes = SmootherEngine.Smooth(sInFileName, sOutFileName, Thresholds);
+            Console.WriteLine(NumMeshes + " meshes smoothed");
+            MessageBox.Show(NumMeshes + " meshes smoothed", "Success", MessageBoxButtons.OK);
         }
 
         private void BVHButton_Click(object sender, EventArgs e)

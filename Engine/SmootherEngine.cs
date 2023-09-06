@@ -531,10 +531,13 @@ namespace XwaSmootherEngine
          */
         public static int Smooth(string sInFileName, string sOutFileName, Dictionary<int, float> Thresholds, bool verbose=true)
         {
-            float threshold = DEFAULT_ANGLE_THRESHOLD;
+            float globalThreshold = DEFAULT_ANGLE_THRESHOLD;
+            float threshold;
             bool bGlobalMeshOverride = Thresholds.ContainsKey(-1);
             if (bGlobalMeshOverride)
-                threshold = Thresholds[-1];
+                globalThreshold = Thresholds[-1];
+            else
+                globalThreshold = DEFAULT_ANGLE_THRESHOLD;
 
             var opt = OptFile.FromFile(sInFileName);
             if (verbose)
@@ -545,12 +548,13 @@ namespace XwaSmootherEngine
             VertexFaceListMap vertexFaceListMap = new VertexFaceListMap();
             for (int meshIdx = 0; meshIdx < opt.Meshes.Count; meshIdx++)
             {
-                // No global mesh override, check each mesh threshold
-                if (!bGlobalMeshOverride) {
-                    if (!Thresholds.ContainsKey(meshIdx))
-                        continue;
+                threshold = globalThreshold;
+                // The mesh threshold overrides the global threshold
+                if (Thresholds.ContainsKey(meshIdx))
                     threshold = Thresholds[meshIdx];
-                }
+                else if (!bGlobalMeshOverride)
+                    // If there's no global threshold and no mesh threshold, skip this mesh
+                    continue;
 
                 var mesh = opt.Meshes[meshIdx];
                 mesh.VertexNormals.Clear();
@@ -656,6 +660,7 @@ namespace XwaSmootherEngine
                     //break;
                 }
             }
+
             opt.Save(sOutFileName);
             if (verbose)
             {
@@ -699,7 +704,7 @@ namespace XwaSmootherEngine
                 {
                     Thresholds.Clear();
                     Thresholds[-1] = threshold;
-                    return Thresholds;
+                    continue;
                 }
 
                 // Parse the indices
@@ -830,22 +835,21 @@ namespace XwaSmootherEngine
             }
 
             // Read the rest of the lines
-            int TotalMeshesProcessed = 0;
+            List<string> sLines = new List<string>();
             while (!file.EndOfStream)
             {
-                string sThreshold = file.ReadLine();
-                //Console.WriteLine(sLine);
-
-                List<string> sThresholds = new List<string>();
-                sThresholds.Add(sThreshold);
-                Dictionary<int, float> Thresholds = SmootherEngine.ParseIndices(sThresholds, out string sError);
-                if (Thresholds == null || Thresholds.Count == 0)
-                    continue;
-
-                // Apply the threshold
-                TotalMeshesProcessed += SmootherEngine.Smooth(sInFileName, sInFileName, Thresholds, false);
+                string sLine = file.ReadLine();
+                sLines.Add(sLine);
             }
             file.Close();
+
+            // Parse the thresholds
+            Dictionary<int, float> Thresholds = SmootherEngine.ParseIndices(sLines, out string sError);
+            if (Thresholds == null || Thresholds.Count == 0)
+                return false;
+
+            // Apply the thresholds
+            int NumMeshes = SmootherEngine.Smooth(sInFileName, sInFileName, Thresholds, false);
             Console.WriteLine(NumMeshes + " meshes smoothed");
             return true;
         }
