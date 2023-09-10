@@ -112,7 +112,7 @@
             this.thresholdsTextBox.Location = new System.Drawing.Point(12, 121);
             this.thresholdsTextBox.Multiline = true;
             this.thresholdsTextBox.Name = "thresholdsTextBox";
-            this.thresholdsTextBox.Size = new System.Drawing.Size(885, 241);
+            this.thresholdsTextBox.Size = new System.Drawing.Size(885, 92);
             this.thresholdsTextBox.TabIndex = 6;
             // 
             // label3
@@ -166,7 +166,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1012, 374);
+            this.ClientSize = new System.Drawing.Size(1012, 222);
             this.Controls.Add(this.applyThrButton);
             this.Controls.Add(this.overwriteCheckBox);
             this.Controls.Add(this.smoothButton);
